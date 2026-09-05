@@ -3,13 +3,15 @@
 Minecraft Mod for carrying Minecraft Java Edition TCP traffic over WebSocket by managing a bundled
 [wstunnel](https://github.com/erebe/wstunnel) sidecar.
 
-WSS is the secure default. Explicit plain WS support is available for isolated testing and for a server-side listener
-placed behind a TLS-terminating reverse proxy.
+The client automatically discovers WSS first, then WS, and otherwise leaves the connection as vanilla TCP. WSS uses
+normal certificate and hostname verification. Explicit plain WS remains intended for isolated testing and for a
+server-side listener placed behind a TLS-terminating reverse proxy.
 
 Current target: Minecraft 1.21.1 + NeoForge 21.1.77 + Java 21.
 
-This is an Alpha-stage technical preview, not a production release. Client and server tunnel startup are disabled by
-default. Client routing is opt-in per server through an allowlist. See `docs/CONFIGURATION.md`.
+This is an Alpha-stage technical preview, not a production release. The server tunnel remains disabled by default.
+The client needs no per-server allowlist or transport selection; its small generated configuration only contains the
+master switch, shared path prefix and process bound. See `docs/CONFIGURATION.md`.
 
 The completed Phase 0 evidence and remaining platform gaps are recorded in `docs/VALIDATION_REPORT.md`. Development
 and system-property overrides are described in `docs/TECHNICAL_VALIDATION.md`.

@@ -9,7 +9,6 @@ public final class ServerConfig {
     private static final ModConfigSpec.EnumValue<TransportProtocol> TRANSPORT;
     private static final ModConfigSpec.ConfigValue<String> BIND_HOST;
     private static final ModConfigSpec.IntValue PUBLIC_PORT;
-    private static final ModConfigSpec.IntValue TARGET_PORT;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
     private static final ModConfigSpec.ConfigValue<String> CERTIFICATE;
     private static final ModConfigSpec.ConfigValue<String> PRIVATE_KEY;
@@ -28,8 +27,6 @@ public final class ServerConfig {
                 .define("bindHost", "0.0.0.0", ServerConfig::isNonBlankString);
         PUBLIC_PORT = builder.comment("WebSocket listener port.")
                 .defineInRange("publicPort", 25565, 1, 65535);
-        TARGET_PORT = builder.comment("Internal Minecraft TCP port. Zero uses the actual dedicated-server port.")
-                .defineInRange("targetPort", 0, 0, 65535);
         PATH_PREFIX = builder.comment("HTTP Upgrade path prefix shared with clients.")
                 .define("pathPrefix", "miguelnetwork-v1", ServerConfig::isNonBlankString);
         CERTIFICATE = builder.comment("Absolute path to a PEM certificate chain.")
@@ -62,8 +59,7 @@ public final class ServerConfig {
     }
 
     public static int targetPort(int actualServerPort) {
-        int configured = Integer.getInteger("miguelnetwork.target.port", TARGET_PORT.get());
-        return configured == 0 ? actualServerPort : configured;
+        return Integer.getInteger("miguelnetwork.target.port", actualServerPort);
     }
 
     public static String pathPrefix() {

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.2
+
+- Remove client-side server allowlists and explicit WSS/WS selection from normal TOML configuration.
+- Discover each endpoint as verified WSS, then WS, and fall back to unchanged vanilla TCP when neither probe succeeds.
+- Use a protocol-fixed internal Minecraft target port and infer it from `server-port` on the server, so clients no
+  longer configure or know the server's loopback port.
+- Cache positive discoveries for the game process and retry negative TCP discoveries after 30 seconds.
+- Add a protocol-compatible wstunnel WebSocket Upgrade probe and validate it against the live trusted-WSS endpoint.
+
 ## 0.1.0-alpha.1
 
 - License MiguelNetwork under Apache-2.0 while retaining wstunnel's BSD-3-Clause notices.

@@ -98,11 +98,29 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 
 ## Not yet verified
 
-- Certificate success/failure behavior against a publicly trusted certificate.
 - A separate UDP denial case; the current strict rule only declares `Tcp` and the wrong TCP destination was verified.
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
 - Long-duration gameplay, forced network-loss recovery and multi-day memory stability.
+
+## ATM10 and trusted WSS validation
+
+- MiguelNetwork loaded successfully in an ATM10 Minecraft 1.21.1 / NeoForge 21.1.215 dedicated server containing the
+  full modpack. Minecraft listened only on `127.0.0.1:25566`, while the bundled Linux wstunnel exposed the configured
+  WS backend on port 35548.
+- A TLS-terminating Nginx proxy exposed `kraber.top:35548` with a publicly trusted certificate and forwarded to that WS
+  backend. The user confirmed status Ping, authentication, joining and gameplay through the resulting WSS path.
+- An independent log audit found nine accepted restriction matches, nine successful connections to
+  `127.0.0.1:25566`, a successful player join and a normal disconnect after roughly 37 minutes. No MiguelNetwork or
+  wstunnel-specific error was present.
+- The new automatic client probe completed a protocol-valid Upgrade against the same live endpoint, including normal
+  certificate and hostname verification, and positively identified it as WSS.
+- The same discovery implementation first rejected TLS and then positively identified the direct CT 109 endpoint
+  `192.168.0.146:35548` as WS. A local negative-path test confirms that two rejected Upgrade attempts return the
+  original address for vanilla TCP.
+- The ATM10 server itself showed severe tick lag and an earlier watchdog report implicating a Touhou Little Maid AI
+  stack. Those performance symptoms were not attributed to MiguelNetwork and mean this was a compatibility and
+  transport test, not a clean long-duration performance baseline.
 
 ## Current interpretation
 

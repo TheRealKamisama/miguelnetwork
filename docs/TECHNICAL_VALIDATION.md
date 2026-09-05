@@ -1,7 +1,8 @@
 # Phase 0 technical validation
 
-The generated NeoForge TOML configurations disable MiguelNetwork sidecars by default so that the game can be launched
-before certificates are provisioned. JVM system properties may override those values for automated validation.
+The generated NeoForge server configuration disables its listener by default so that the game can be launched before
+certificates are provisioned. Client transport discovery is enabled by default. JVM system properties may override
+values for automated validation.
 
 For a WSS server validation run, configure `run/server/server.properties` as:
 
@@ -24,9 +25,11 @@ The client run needs:
 
 ```text
 -Dmiguelnetwork.client.enabled=true
--Dmiguelnetwork.client.allowedServers=127.0.0.1:25565
--Dmiguelnetwork.target.port=25566
 ```
+
+Normally no client properties are required. Tests may bypass discovery with
+`-Dmiguelnetwork.client.transport=WSS` or `WS`; `-Dmiguelnetwork.target.port` remains a development-only compatibility
+override for the fixed protocol target port.
 
 For a loopback-only development test, wstunnel's built-in self-signed certificate may be enabled explicitly:
 
@@ -34,7 +37,7 @@ For a loopback-only development test, wstunnel's built-in self-signed certificat
 # server only
 -Dmiguelnetwork.tls.allowBuiltInSelfSigned=true
 
-# client only
+# client only; requires a forced WSS transport in local tests
 -Dmiguelnetwork.tls.verify=false
 ```
 
@@ -56,7 +59,7 @@ For an explicitly unencrypted WS test, omit all TLS properties and add the follo
 # server
 -Dmiguelnetwork.server.transport=WS
 
-# client
+# client test override; normal clients discover this automatically
 -Dmiguelnetwork.client.transport=WS
 ```
 
@@ -66,7 +69,9 @@ while the client remains on the default WSS transport.
 ## Current Phase 0 limitations
 
 - SRV behavior, credentials and custom CA bundles are not implemented.
-- Plain WS support exists for a reverse-proxy backend, but Nginx interoperability has not yet been validated.
+- Automatic discovery adds up to two 1.5-second probes to the first connection for an unknown endpoint; negative TCP
+  discoveries are cached for 30 seconds.
+- First-contact automatic fallback from WSS to WS is opportunistic and cannot provide cryptographic downgrade protection.
 - The current readiness contract uses the pinned v10.7.1 log messages and process exit state.
 - A JVM hard crash can leave the child process alive.
 - The JAR embeds the official v10.7.1 Windows/Linux x64 binaries. This remains a technical preview and has not yet

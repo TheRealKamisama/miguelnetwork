@@ -1,42 +1,26 @@
 package io.github.therealkamisama.miguelnetwork.config;
 
-import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
+import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
 
 public final class ClientConfig {
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.BooleanValue ENABLED;
-    private static final ModConfigSpec.EnumValue<TransportProtocol> TRANSPORT;
-    private static final ModConfigSpec.ConfigValue<List<? extends String>> ALLOWED_SERVERS;
-    private static final ModConfigSpec.IntValue TARGET_PORT;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ModConfigSpec.BooleanValue VERIFY_CERTIFICATE;
     private static final ModConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
         builder.comment("MiguelNetwork client-side WebSocket transport settings.");
-        ENABLED = builder.comment("Master client switch. An empty allowlist still routes nothing.")
-                .define("enabled", false);
-        TRANSPORT = builder.comment(
-                        "WebSocket transport. WSS is the secure default; WS sends tunnel traffic without TLS.")
-                .defineEnum("transport", TransportProtocol.WSS);
-        ALLOWED_SERVERS = builder.comment(
-                        "Minecraft server addresses that should use the configured WebSocket transport.",
-                        "Entries may be host, host:port, [IPv6]:port, *.example.com, or * for every server.")
-                .defineListAllowEmpty("allowedServers", List.of(), () -> "mc.example.com:25565",
-                        ClientConfig::isNonBlankString);
-        TARGET_PORT = builder.comment("Internal Minecraft port requested from the server-side wstunnel.")
-                .defineInRange("targetPort", 25566, 1, 65535);
+        ENABLED = builder.comment(
+                        "Master client switch. When enabled, endpoints are discovered in WSS, WS, then TCP order.")
+                .define("enabled", true);
         PATH_PREFIX = builder.comment("HTTP Upgrade path prefix shared with the server configuration.")
-                .define("pathPrefix", "miguelnetwork-v1", ClientConfig::isNonBlankString);
-        VERIFY_CERTIFICATE = builder.comment(
-                        "Verify the WSS certificate and hostname. Keep enabled outside isolated development tests.")
-                .define("verifyCertificate", true);
+                .define("pathPrefix", MiguelNetworkProtocol.DEFAULT_PATH_PREFIX, ClientConfig::isNonBlankString);
         MAX_TUNNEL_PROCESSES = builder.comment(
                         "Maximum simultaneous per-endpoint wstunnel processes. Least-recently-used entries are evicted.")
                 .defineInRange("maxTunnelProcesses", 8, 1, 32);
@@ -50,20 +34,8 @@ public final class ClientConfig {
         return booleanProperty("miguelnetwork.client.enabled", ENABLED.get());
     }
 
-    public static TransportProtocol transport() {
-        return TransportProtocol.property("miguelnetwork.client.transport", TRANSPORT.get());
-    }
-
-    public static boolean allows(String host, int port) {
-        String override = System.getProperty("miguelnetwork.client.allowedServers");
-        List<String> entries = override == null
-                ? ALLOWED_SERVERS.get().stream().map(String::valueOf).toList()
-                : Arrays.stream(override.split(",")).map(String::trim).filter(value -> !value.isEmpty()).toList();
-        return EndpointMatcher.matches(host, port, entries);
-    }
-
     public static int targetPort() {
-        return Integer.getInteger("miguelnetwork.target.port", TARGET_PORT.get());
+        return Integer.getInteger("miguelnetwork.target.port", MiguelNetworkProtocol.MINECRAFT_TARGET_PORT);
     }
 
     public static String pathPrefix() {
@@ -71,7 +43,15 @@ public final class ClientConfig {
     }
 
     public static boolean verifyCertificate() {
-        return booleanProperty("miguelnetwork.tls.verify", VERIFY_CERTIFICATE.get());
+        return booleanProperty("miguelnetwork.tls.verify", true);
+    }
+
+    public static Optional<TransportProtocol> forcedTransport() {
+        String value = System.getProperty("miguelnetwork.client.transport");
+        if (value == null || value.isBlank() || value.equalsIgnoreCase("AUTO")) {
+            return Optional.empty();
+        }
+        return Optional.of(TransportProtocol.valueOf(value.trim().toUpperCase(Locale.ROOT)));
     }
 
     public static int maxTunnelProcesses() {

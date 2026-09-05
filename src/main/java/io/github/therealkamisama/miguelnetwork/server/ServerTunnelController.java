@@ -3,6 +3,7 @@ package io.github.therealkamisama.miguelnetwork.server;
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
+import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
@@ -30,6 +31,15 @@ public final class ServerTunnelController {
         try {
             int publicPort = ServerConfig.publicPort();
             int targetPort = ServerConfig.targetPort(server.getPort());
+            if (targetPort != MiguelNetworkProtocol.MINECRAFT_TARGET_PORT) {
+                MiguelNetwork.LOGGER.warn(
+                        "MiguelNetwork clients use protocol target port {}, but this server targets {}. "
+                                + "Use server-port={} unless both sides intentionally use the development override.",
+                        MiguelNetworkProtocol.MINECRAFT_TARGET_PORT,
+                        targetPort,
+                        MiguelNetworkProtocol.MINECRAFT_TARGET_PORT
+                );
+            }
             String bindHost = ServerConfig.bindHost();
             String pathPrefix = ServerConfig.pathPrefix();
             TransportProtocol transport = ServerConfig.transport();

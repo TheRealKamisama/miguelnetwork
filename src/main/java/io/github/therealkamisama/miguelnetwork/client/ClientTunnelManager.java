@@ -17,9 +17,14 @@ import java.time.Duration;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 public final class ClientTunnelManager {
+    private static final Duration DISCOVERY_TIMEOUT = Duration.ofMillis(1500);
+    private static final Duration TCP_DISCOVERY_TTL = Duration.ofSeconds(30);
+    private static final int MAX_DISCOVERED_ROUTES = 256;
     private static final Map<String, ClientTunnel> TUNNELS = new LinkedHashMap<>(16, 0.75f, true);
+    private static final Map<String, CachedRoute> DISCOVERED_ROUTES = new LinkedHashMap<>(16, 0.75f, true);
     private static boolean insecureWarningLogged;
     private static boolean unencryptedWarningLogged;
 
@@ -27,7 +32,7 @@ public final class ClientTunnelManager {
     }
 
     public static synchronized InetSocketAddress redirect(InetSocketAddress original) {
-        if (!ClientConfig.enabled() || !ClientConfig.allows(original.getHostString(), original.getPort())) {
+        if (!ClientConfig.enabled()) {
             return original;
         }
 
@@ -40,13 +45,43 @@ public final class ClientTunnelManager {
         }
         closeAndRemove(endpoint);
 
+        CachedRoute cached = DISCOVERED_ROUTES.get(endpoint);
+        if (cached != null && cached.route() == DiscoveredRoute.TCP && cached.isExpired()) {
+            DISCOVERED_ROUTES.remove(endpoint);
+            cached = null;
+        }
+        DiscoveredRoute route = cached == null ? null : cached.route();
+        if (route == DiscoveredRoute.TCP) {
+            return original;
+        }
+
+        if (route == null) {
+            Optional<TransportProtocol> forced = ClientConfig.forcedTransport();
+            Optional<TransportProtocol> detected = forced.isPresent()
+                    ? forced
+                    : ClientTransportProbe.detect(
+                            host,
+                            publicPort,
+                            ClientConfig.targetPort(),
+                            ClientConfig.pathPrefix(),
+                            DISCOVERY_TIMEOUT
+                    );
+            route = detected.map(DiscoveredRoute::from).orElse(DiscoveredRoute.TCP);
+            rememberRoute(endpoint, route);
+            if (route == DiscoveredRoute.TCP) {
+                MiguelNetwork.LOGGER.info("MiguelNetwork discovered vanilla TCP endpoint {}", endpoint);
+                return original;
+            }
+            MiguelNetwork.LOGGER.info("MiguelNetwork discovered {} endpoint {}", route, endpoint);
+        }
+
         ManagedWstunnelProcess started = null;
         try {
             evictToCapacity(ClientConfig.maxTunnelProcesses());
             int localPort = findCandidatePort();
             int targetPort = ClientConfig.targetPort();
             String pathPrefix = ClientConfig.pathPrefix();
-            TransportProtocol transport = ClientConfig.transport();
+            TransportProtocol transport = route.transport();
             boolean verifyCertificate = ClientConfig.verifyCertificate();
             if (!transport.usesTls() && !unencryptedWarningLogged) {
                 unencryptedWarningLogged = true;
@@ -96,6 +131,15 @@ public final class ClientTunnelManager {
         }
     }
 
+    private static void rememberRoute(String endpoint, DiscoveredRoute route) {
+        DISCOVERED_ROUTES.put(endpoint, new CachedRoute(route, System.nanoTime()));
+        while (DISCOVERED_ROUTES.size() > MAX_DISCOVERED_ROUTES) {
+            Iterator<String> iterator = DISCOVERED_ROUTES.keySet().iterator();
+            iterator.next();
+            iterator.remove();
+        }
+    }
+
     private static int findCandidatePort() throws IOException {
         try (ServerSocket socket = new ServerSocket()) {
             socket.bind(new InetSocketAddress("127.0.0.1", 0));
@@ -108,11 +152,36 @@ public final class ClientTunnelManager {
             tunnel.process().close();
         }
         TUNNELS.clear();
+        DISCOVERED_ROUTES.clear();
     }
 
     private record ClientTunnel(ManagedWstunnelProcess process, int localPort) {
         private InetSocketAddress localAddress() {
             return new InetSocketAddress("127.0.0.1", localPort);
+        }
+    }
+
+    private record CachedRoute(DiscoveredRoute route, long discoveredAtNanos) {
+        private boolean isExpired() {
+            return System.nanoTime() - discoveredAtNanos >= TCP_DISCOVERY_TTL.toNanos();
+        }
+    }
+
+    private enum DiscoveredRoute {
+        WSS,
+        WS,
+        TCP;
+
+        private static DiscoveredRoute from(TransportProtocol transport) {
+            return transport == TransportProtocol.WSS ? WSS : WS;
+        }
+
+        private TransportProtocol transport() {
+            return switch (this) {
+                case WSS -> TransportProtocol.WSS;
+                case WS -> TransportProtocol.WS;
+                case TCP -> throw new IllegalStateException("TCP does not use a wstunnel transport");
+            };
         }
     }
 }
