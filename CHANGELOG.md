@@ -3,6 +3,7 @@
 ## 0.1.0-alpha.1
 
 - License MiguelNetwork under Apache-2.0 while retaining wstunnel's BSD-3-Clause notices.
+- Record a preliminary license audit of wstunnel's locked Rust dependency closure.
 - Add native NeoForge client and dedicated-server TOML configuration.
 - Allow development runs to honor TOML values without forced `enabled=false` system-property overrides.
 - Add opt-in client routing by exact host, endpoint, wildcard subdomain, or global wildcard.
