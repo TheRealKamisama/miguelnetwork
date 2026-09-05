@@ -81,8 +81,20 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - The WS listener was then moved to TCP port 35548 and exposed by the site's public hostname through the gateway's
   matching TCP port mapping. A status Ping through that public endpoint succeeded from inside the LAN via NAT loopback.
 - This proves the cross-platform Windows-client/Linux-server WS transport, Linux bundled-binary extraction, and the
-  configured public endpoint's loopback path. A genuinely external login and gameplay session remain to be exercised
-  before treating the public WS experiment as complete.
+  configured public endpoint's loopback path. External login results are recorded below.
+
+## External login and repeated-connection validation
+
+- A client on a genuinely external network reached the public WS endpoint. Server logs recorded the public peer,
+  accepted each tunnel through the `MiguelNetwork Minecraft only` restriction, completed account authentication, and
+  recorded multiple successful joins, disconnects and rejoins.
+- A separate automated check then sent 50 sequential Minecraft status connections through one reused public-endpoint
+  client sidecar; all 50 completed in 4.77 seconds.
+- The Linux server-side wstunnel stayed at four OS threads and 10,560 KiB RSS before and after those 50 connections.
+  The temporary Windows client sidecar dropped from four threads to three after completion, and its private memory did
+  not grow. No stress-test TCP connection remained established afterward.
+- This is evidence of bounded connection cleanup under short repeated sessions, not a proof that no leak can exist
+  during multi-day operation or abnormal JVM/process termination.
 
 ## Not yet verified
 
@@ -90,7 +102,7 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - A separate UDP denial case; the current strict rule only declares `Tcp` and the wrong TCP destination was verified.
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
-- Public-internet login, gameplay and reconnect behavior from a genuinely external network.
+- Long-duration gameplay, forced network-loss recovery and multi-day memory stability.
 
 ## Current interpretation
 
