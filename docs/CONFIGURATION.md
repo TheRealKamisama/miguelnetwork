@@ -40,6 +40,7 @@ allowedServers = ["mc.example.com:25565"]
 targetPort = 25566
 pathPrefix = "miguelnetwork-v1"
 verifyCertificate = true
+maxTunnelProcesses = 8
 ```
 
 Players continue entering the normal public Minecraft address. Accepted allowlist forms are:
@@ -51,6 +52,8 @@ Players continue entering the normal public Minecraft address. Accepted allowlis
 - `*` — every multiplayer connection (not recommended).
 
 Host matching is case-insensitive. An address not on the allowlist uses Minecraft's normal TCP path unchanged.
+Each active WSS endpoint uses its own sidecar so concurrent multiplayer status Pings cannot interrupt one another. The
+least-recently-used sidecar is stopped when `maxTunnelProcesses` is reached.
 
 ## Isolated development only
 

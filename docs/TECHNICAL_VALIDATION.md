@@ -1,9 +1,9 @@
 # Phase 0 technical validation
 
-The Gradle run configurations disable MiguelNetwork sidecars by default so that the project can be built and the game
-can be launched before certificates are provisioned.
+The generated NeoForge TOML configurations disable MiguelNetwork sidecars by default so that the game can be launched
+before certificates are provisioned. JVM system properties may override those values for automated validation.
 
-For a WSS server validation run, configure `run/server.properties` as:
+For a WSS server validation run, configure `run/server/server.properties` as:
 
 ```properties
 server-ip=127.0.0.1

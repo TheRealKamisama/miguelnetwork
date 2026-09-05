@@ -13,6 +13,7 @@ public final class ClientConfig {
     private static final ModConfigSpec.IntValue TARGET_PORT;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
     private static final ModConfigSpec.BooleanValue VERIFY_CERTIFICATE;
+    private static final ModConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -31,6 +32,9 @@ public final class ClientConfig {
         VERIFY_CERTIFICATE = builder.comment(
                         "Verify the WSS certificate and hostname. Keep enabled outside isolated development tests.")
                 .define("verifyCertificate", true);
+        MAX_TUNNEL_PROCESSES = builder.comment(
+                        "Maximum simultaneous per-endpoint wstunnel processes. Least-recently-used entries are evicted.")
+                .defineInRange("maxTunnelProcesses", 8, 1, 32);
         SPEC = builder.build();
     }
 
@@ -59,6 +63,11 @@ public final class ClientConfig {
 
     public static boolean verifyCertificate() {
         return booleanProperty("miguelnetwork.tls.verify", VERIFY_CERTIFICATE.get());
+    }
+
+    public static int maxTunnelProcesses() {
+        int configured = Integer.getInteger("miguelnetwork.client.maxTunnelProcesses", MAX_TUNNEL_PROCESSES.get());
+        return Math.max(1, Math.min(32, configured));
     }
 
     private static boolean booleanProperty(String name, boolean fallback) {

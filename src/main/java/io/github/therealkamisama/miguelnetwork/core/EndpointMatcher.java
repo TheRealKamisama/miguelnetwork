@@ -22,8 +22,11 @@ public final class EndpointMatcher {
         return false;
     }
 
-    static String formatEndpoint(String host, int port) {
-        return host.indexOf(':') >= 0 ? "[" + host + "]:" + port : host + ":" + port;
+    public static String formatEndpoint(String host, int port) {
+        String normalizedHost = normalizeHost(host);
+        return normalizedHost.indexOf(':') >= 0
+                ? "[" + normalizedHost + "]:" + port
+                : normalizedHost + ":" + port;
     }
 
     private static String normalizeHost(String host) {

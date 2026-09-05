@@ -2,6 +2,7 @@ package io.github.therealkamisama.miguelnetwork.client;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
+import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
@@ -12,11 +13,13 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 public final class ClientTunnelManager {
-    private static ManagedWstunnelProcess process;
-    private static String currentEndpoint;
-    private static int currentLocalPort;
+    private static final Map<String, ClientTunnel> TUNNELS = new LinkedHashMap<>(16, 0.75f, true);
+    private static boolean insecureWarningLogged;
 
     private ClientTunnelManager() {
     }
@@ -28,37 +31,60 @@ public final class ClientTunnelManager {
 
         String host = original.getHostString();
         int publicPort = original.getPort();
-        String endpoint = host + ":" + publicPort;
-        if (process != null && process.isAlive() && endpoint.equals(currentEndpoint)) {
-            return new InetSocketAddress("127.0.0.1", currentLocalPort);
+        String endpoint = EndpointMatcher.formatEndpoint(host, publicPort);
+        ClientTunnel existing = TUNNELS.get(endpoint);
+        if (existing != null && existing.process().isAlive()) {
+            return existing.localAddress();
         }
+        closeAndRemove(endpoint);
 
-        stop();
+        ManagedWstunnelProcess started = null;
         try {
+            evictToCapacity(ClientConfig.maxTunnelProcesses());
             int localPort = findCandidatePort();
             int targetPort = ClientConfig.targetPort();
             String pathPrefix = ClientConfig.pathPrefix();
             boolean verifyCertificate = ClientConfig.verifyCertificate();
-            if (!verifyCertificate) {
+            if (!verifyCertificate && !insecureWarningLogged) {
+                insecureWarningLogged = true;
                 MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 MiguelNetwork.LOGGER.warn("MiguelNetwork TLS CERTIFICATE VERIFICATION IS DISABLED (DEVELOPMENT ONLY)");
                 MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
             }
             Path executable = NativeWstunnel.resolve(FMLPaths.GAMEDIR.get());
-            process = ManagedWstunnelProcess.start(
+            started = ManagedWstunnelProcess.start(
                     WstunnelCommands.client(executable, host, publicPort, localPort, targetPort, pathPrefix,
                             verifyCertificate),
                     line -> line.contains("Starting TCP server listening cnx on"),
                     MiguelNetwork.LOGGER
             );
-            process.awaitReady(Duration.ofSeconds(10));
-            currentEndpoint = endpoint;
-            currentLocalPort = localPort;
+            started.awaitReady(Duration.ofSeconds(10));
+            ClientTunnel tunnel = new ClientTunnel(started, localPort);
+            TUNNELS.put(endpoint, tunnel);
             MiguelNetwork.LOGGER.info("MiguelNetwork redirects {} to 127.0.0.1:{}", endpoint, localPort);
-            return new InetSocketAddress("127.0.0.1", localPort);
+            return tunnel.localAddress();
         } catch (IOException exception) {
-            stop();
+            if (started != null) {
+                started.close();
+            }
             throw new IllegalStateException("Cannot prepare MiguelNetwork tunnel for " + endpoint, exception);
+        }
+    }
+
+    private static void evictToCapacity(int maximum) {
+        while (TUNNELS.size() >= maximum) {
+            Iterator<Map.Entry<String, ClientTunnel>> iterator = TUNNELS.entrySet().iterator();
+            Map.Entry<String, ClientTunnel> eldest = iterator.next();
+            iterator.remove();
+            eldest.getValue().process().close();
+            MiguelNetwork.LOGGER.info("MiguelNetwork evicted least-recently-used tunnel for {}", eldest.getKey());
+        }
+    }
+
+    private static void closeAndRemove(String endpoint) {
+        ClientTunnel removed = TUNNELS.remove(endpoint);
+        if (removed != null) {
+            removed.process().close();
         }
     }
 
@@ -70,11 +96,15 @@ public final class ClientTunnelManager {
     }
 
     public static synchronized void stop() {
-        if (process != null) {
-            process.close();
+        for (ClientTunnel tunnel : TUNNELS.values()) {
+            tunnel.process().close();
         }
-        process = null;
-        currentEndpoint = null;
-        currentLocalPort = 0;
+        TUNNELS.clear();
+    }
+
+    private record ClientTunnel(ManagedWstunnelProcess process, int localPort) {
+        private InetSocketAddress localAddress() {
+            return new InetSocketAddress("127.0.0.1", localPort);
+        }
     }
 }

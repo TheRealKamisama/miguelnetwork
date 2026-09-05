@@ -53,6 +53,20 @@ The host environment defines the conventional variable `NO_COLOR=1`. wstunnel v1
 that environment value as a boolean and rejects `1`, even when `--no-color` is passed explicitly. MiguelNetwork now
 removes inherited `NO_COLOR` from the child environment and supplies `--no-color` itself.
 
+## Phase 1 configuration validation
+
+- Native NeoForge TOML configuration was loaded on both sides without JVM property overrides.
+- With `127.0.0.1:25565` allowlisted, Minecraft quick-play started a client sidecar, completed WSS/TLS, matched the
+  server restriction, connected to the inferred Minecraft port 25566, and joined the world.
+- With the same address removed from the allowlist, no client sidecar was created. Minecraft's unchanged TCP connection
+  reached the WSS listener directly and was rejected as an invalid TLS content type, confirming that unmatched entries
+  follow the vanilla connection path.
+- Client shutdown removed its sidecar. Force-terminating the Windows Gradle server batch process bypassed the normal
+  Minecraft stop event and left its sidecar running; it was detected and removed manually. Hard parent termination
+  therefore remains an explicit limitation.
+- Review identified that a single global client sidecar would make concurrent status Pings for different WSS servers
+  interrupt each other. Phase 1 now retains one sidecar per endpoint with a configurable, LRU-bounded process limit.
+
 ## Not yet verified
 
 - Certificate success/failure behavior against a publicly trusted certificate.
