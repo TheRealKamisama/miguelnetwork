@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.client;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
+import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
@@ -21,7 +22,7 @@ public final class ClientTunnelManager {
     }
 
     public static synchronized InetSocketAddress redirect(InetSocketAddress original) {
-        if (!Boolean.parseBoolean(System.getProperty("miguelnetwork.client.enabled", "false"))) {
+        if (!ClientConfig.enabled() || !ClientConfig.allows(original.getHostString(), original.getPort())) {
             return original;
         }
 
@@ -35,11 +36,9 @@ public final class ClientTunnelManager {
         stop();
         try {
             int localPort = findCandidatePort();
-            int targetPort = Integer.getInteger("miguelnetwork.target.port", 25566);
-            String pathPrefix = System.getProperty("miguelnetwork.pathPrefix", "miguelnetwork-v1");
-            boolean verifyCertificate = Boolean.parseBoolean(
-                    System.getProperty("miguelnetwork.tls.verify", "true")
-            );
+            int targetPort = ClientConfig.targetPort();
+            String pathPrefix = ClientConfig.pathPrefix();
+            boolean verifyCertificate = ClientConfig.verifyCertificate();
             if (!verifyCertificate) {
                 MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 MiguelNetwork.LOGGER.warn("MiguelNetwork TLS CERTIFICATE VERIFICATION IS DISABLED (DEVELOPMENT ONLY)");

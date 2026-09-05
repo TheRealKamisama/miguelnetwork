@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.server;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
+import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
@@ -20,16 +21,16 @@ public final class ServerTunnelController {
     }
 
     public static synchronized void start(MinecraftServer server) {
-        if (!Boolean.parseBoolean(System.getProperty("miguelnetwork.server.enabled", "false"))) {
-            MiguelNetwork.LOGGER.info("MiguelNetwork server tunnel is disabled for this technical-validation run");
+        if (!ServerConfig.enabled()) {
+            MiguelNetwork.LOGGER.info("MiguelNetwork server tunnel is disabled");
             return;
         }
         stop();
         try {
-            int publicPort = Integer.getInteger("miguelnetwork.public.port", 25565);
-            int targetPort = Integer.getInteger("miguelnetwork.target.port", 25566);
-            String bindHost = System.getProperty("miguelnetwork.bindHost", "0.0.0.0");
-            String pathPrefix = System.getProperty("miguelnetwork.pathPrefix", "miguelnetwork-v1");
+            int publicPort = ServerConfig.publicPort();
+            int targetPort = ServerConfig.targetPort(server.getPort());
+            String bindHost = ServerConfig.bindHost();
+            String pathPrefix = ServerConfig.pathPrefix();
             Path gameDirectory = FMLPaths.GAMEDIR.get();
             Path executable = NativeWstunnel.resolve(gameDirectory);
             Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
@@ -38,12 +39,10 @@ public final class ServerTunnelController {
 
             Path certificate;
             Path privateKey;
-            String certificateValue = System.getProperty("miguelnetwork.tls.certificate", "").trim();
-            String privateKeyValue = System.getProperty("miguelnetwork.tls.privateKey", "").trim();
+            String certificateValue = ServerConfig.certificate();
+            String privateKeyValue = ServerConfig.privateKey();
             if (certificateValue.isEmpty() && privateKeyValue.isEmpty()) {
-                boolean allowBuiltInSelfSigned = Boolean.parseBoolean(
-                        System.getProperty("miguelnetwork.tls.allowBuiltInSelfSigned", "false")
-                );
+                boolean allowBuiltInSelfSigned = ServerConfig.allowBuiltInSelfSigned();
                 if (!allowBuiltInSelfSigned) {
                     throw new IOException("Missing TLS certificate and private key. For local development only, set "
                             + "-Dmiguelnetwork.tls.allowBuiltInSelfSigned=true");

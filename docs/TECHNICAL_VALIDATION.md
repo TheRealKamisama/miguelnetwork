@@ -24,6 +24,7 @@ The client run needs:
 
 ```text
 -Dmiguelnetwork.client.enabled=true
+-Dmiguelnetwork.client.allowedServers=127.0.0.1:25565
 -Dmiguelnetwork.target.port=25566
 ```
 
