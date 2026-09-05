@@ -15,11 +15,12 @@ public final class WstunnelCommands {
             int localPort,
             int targetPort,
             String pathPrefix,
+            TransportProtocol transport,
             boolean verifyCertificate
     ) {
         List<String> command = base(executable, 1);
         command.add("client");
-        if (verifyCertificate) {
+        if (transport.usesTls() && verifyCertificate) {
             command.add("--tls-verify-certificate");
         }
         command.add("--connection-retry-max-backoff");
@@ -30,7 +31,7 @@ public final class WstunnelCommands {
         command.add(pathPrefix);
         command.add("-L");
         command.add("tcp://127.0.0.1:" + localPort + ":127.0.0.1:" + targetPort);
-        command.add("wss://" + formatHost(host) + ":" + publicPort);
+        command.add(transport.scheme() + "://" + formatHost(host) + ":" + publicPort);
         return command;
     }
 
@@ -39,6 +40,7 @@ public final class WstunnelCommands {
             String bindHost,
             int publicPort,
             Path restrictions,
+            TransportProtocol transport,
             Path certificate,
             Path privateKey
     ) {
@@ -49,13 +51,16 @@ public final class WstunnelCommands {
         if ((certificate == null) != (privateKey == null)) {
             throw new IllegalArgumentException("TLS certificate and private key must either both be set or both be absent");
         }
+        if (!transport.usesTls() && certificate != null) {
+            throw new IllegalArgumentException("TLS certificate and private key cannot be used with WS transport");
+        }
         if (certificate != null) {
             command.add("--tls-certificate");
             command.add(certificate.toString());
             command.add("--tls-private-key");
             command.add(privateKey.toString());
         }
-        command.add("wss://" + formatHost(bindHost) + ":" + publicPort);
+        command.add(transport.scheme() + "://" + formatHost(bindHost) + ":" + publicPort);
         return command;
     }
 

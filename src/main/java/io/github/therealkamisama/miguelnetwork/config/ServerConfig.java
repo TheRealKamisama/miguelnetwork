@@ -1,10 +1,12 @@
 package io.github.therealkamisama.miguelnetwork.config;
 
+import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class ServerConfig {
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.BooleanValue ENABLED;
+    private static final ModConfigSpec.EnumValue<TransportProtocol> TRANSPORT;
     private static final ModConfigSpec.ConfigValue<String> BIND_HOST;
     private static final ModConfigSpec.IntValue PUBLIC_PORT;
     private static final ModConfigSpec.IntValue TARGET_PORT;
@@ -15,12 +17,16 @@ public final class ServerConfig {
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        builder.comment("MiguelNetwork dedicated-server WSS transport settings.");
+        builder.comment("MiguelNetwork dedicated-server WebSocket transport settings.");
         ENABLED = builder.comment("Start the bundled wstunnel server when the dedicated server is ready.")
                 .define("enabled", false);
+        TRANSPORT = builder.comment(
+                        "WebSocket transport. WSS is the secure default; use WS only behind a TLS reverse proxy",
+                        "or for an explicitly isolated development test.")
+                .defineEnum("transport", TransportProtocol.WSS);
         BIND_HOST = builder.comment("Address exposed by wstunnel. Use 0.0.0.0 for all IPv4 interfaces.")
                 .define("bindHost", "0.0.0.0", ServerConfig::isNonBlankString);
-        PUBLIC_PORT = builder.comment("Public WSS listener port.")
+        PUBLIC_PORT = builder.comment("WebSocket listener port.")
                 .defineInRange("publicPort", 25565, 1, 65535);
         TARGET_PORT = builder.comment("Internal Minecraft TCP port. Zero uses the actual dedicated-server port.")
                 .defineInRange("targetPort", 0, 0, 65535);
@@ -41,6 +47,10 @@ public final class ServerConfig {
 
     public static boolean enabled() {
         return booleanProperty("miguelnetwork.server.enabled", ENABLED.get());
+    }
+
+    public static TransportProtocol transport() {
+        return TransportProtocol.property("miguelnetwork.server.transport", TRANSPORT.get());
     }
 
     public static String bindHost() {

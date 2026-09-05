@@ -5,6 +5,7 @@ import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
+import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import net.neoforged.fml.loading.FMLPaths;
 
@@ -20,6 +21,7 @@ import java.util.Map;
 public final class ClientTunnelManager {
     private static final Map<String, ClientTunnel> TUNNELS = new LinkedHashMap<>(16, 0.75f, true);
     private static boolean insecureWarningLogged;
+    private static boolean unencryptedWarningLogged;
 
     private ClientTunnelManager() {
     }
@@ -44,8 +46,14 @@ public final class ClientTunnelManager {
             int localPort = findCandidatePort();
             int targetPort = ClientConfig.targetPort();
             String pathPrefix = ClientConfig.pathPrefix();
+            TransportProtocol transport = ClientConfig.transport();
             boolean verifyCertificate = ClientConfig.verifyCertificate();
-            if (!verifyCertificate && !insecureWarningLogged) {
+            if (!transport.usesTls() && !unencryptedWarningLogged) {
+                unencryptedWarningLogged = true;
+                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                MiguelNetwork.LOGGER.warn("MiguelNetwork CLIENT TRANSPORT IS UNENCRYPTED WS (DEVELOPMENT ONLY)");
+                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            } else if (!verifyCertificate && !insecureWarningLogged) {
                 insecureWarningLogged = true;
                 MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
                 MiguelNetwork.LOGGER.warn("MiguelNetwork TLS CERTIFICATE VERIFICATION IS DISABLED (DEVELOPMENT ONLY)");
@@ -54,7 +62,7 @@ public final class ClientTunnelManager {
             Path executable = NativeWstunnel.resolve(FMLPaths.GAMEDIR.get());
             started = ManagedWstunnelProcess.start(
                     WstunnelCommands.client(executable, host, publicPort, localPort, targetPort, pathPrefix,
-                            verifyCertificate),
+                            transport, verifyCertificate),
                     line -> line.contains("Starting TCP server listening cnx on"),
                     MiguelNetwork.LOGGER
             );

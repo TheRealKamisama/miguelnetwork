@@ -4,6 +4,7 @@ import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
+import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.loading.FMLPaths;
@@ -31,6 +32,7 @@ public final class ServerTunnelController {
             int targetPort = ServerConfig.targetPort(server.getPort());
             String bindHost = ServerConfig.bindHost();
             String pathPrefix = ServerConfig.pathPrefix();
+            TransportProtocol transport = ServerConfig.transport();
             Path gameDirectory = FMLPaths.GAMEDIR.get();
             Path executable = NativeWstunnel.resolve(gameDirectory);
             Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
@@ -41,7 +43,14 @@ public final class ServerTunnelController {
             Path privateKey;
             String certificateValue = ServerConfig.certificate();
             String privateKeyValue = ServerConfig.privateKey();
-            if (certificateValue.isEmpty() && privateKeyValue.isEmpty()) {
+            if (!transport.usesTls()) {
+                certificate = null;
+                privateKey = null;
+                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                MiguelNetwork.LOGGER.warn("MiguelNetwork SERVER TRANSPORT IS UNENCRYPTED WS");
+                MiguelNetwork.LOGGER.warn("Use this only behind a TLS reverse proxy or for an isolated test");
+                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            } else if (certificateValue.isEmpty() && privateKeyValue.isEmpty()) {
                 boolean allowBuiltInSelfSigned = ServerConfig.allowBuiltInSelfSigned();
                 if (!allowBuiltInSelfSigned) {
                     throw new IOException("Missing TLS certificate and private key. For local development only, set "
@@ -59,13 +68,14 @@ public final class ServerTunnelController {
                 privateKey = requiredPath("miguelnetwork.tls.privateKey", privateKeyValue);
             }
             process = ManagedWstunnelProcess.start(
-                    WstunnelCommands.server(executable, bindHost, publicPort, generated, certificate, privateKey),
+                    WstunnelCommands.server(executable, bindHost, publicPort, generated, transport,
+                            certificate, privateKey),
                     line -> line.contains("Starting wstunnel server listening on"),
                     MiguelNetwork.LOGGER
             );
             process.awaitReady(Duration.ofSeconds(10));
-            MiguelNetwork.LOGGER.info("MiguelNetwork WSS listener is ready on {}:{} -> 127.0.0.1:{}",
-                    bindHost, publicPort, targetPort);
+            MiguelNetwork.LOGGER.info("MiguelNetwork {} listener is ready on {}:{} -> 127.0.0.1:{}",
+                    transport, bindHost, publicPort, targetPort);
         } catch (Exception exception) {
             stop();
             MiguelNetwork.LOGGER.error("MiguelNetwork server tunnel failed to start", exception);

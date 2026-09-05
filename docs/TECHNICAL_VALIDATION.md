@@ -50,11 +50,23 @@ For development only, either use the bundled binary or override it on both sides
 
 The player connects to the WSS endpoint as a normal Minecraft address, for example `mc.example.com:25565`.
 
+For an explicitly unencrypted WS test, omit all TLS properties and add the following property to each process:
+
+```text
+# server
+-Dmiguelnetwork.server.transport=WS
+
+# client
+-Dmiguelnetwork.client.transport=WS
+```
+
+Direct WS exposure is for temporary testing only. In a TLS-terminating reverse-proxy deployment, the server uses WS
+while the client remains on the default WSS transport.
+
 ## Current Phase 0 limitations
 
-- Client interception is deliberately broad: every Minecraft `Connection.connect` call is redirected when the client
-  property is enabled.
-- SRV records, per-server mode, credentials, reverse proxies and custom CA bundles are not implemented.
+- SRV behavior, credentials and custom CA bundles are not implemented.
+- Plain WS support exists for a reverse-proxy backend, but Nginx interoperability has not yet been validated.
 - The current readiness contract uses the pinned v10.7.1 log messages and process exit state.
 - A JVM hard crash can leave the child process alive.
 - The JAR embeds the official v10.7.1 Windows/Linux x64 binaries. This remains a technical preview and has not yet

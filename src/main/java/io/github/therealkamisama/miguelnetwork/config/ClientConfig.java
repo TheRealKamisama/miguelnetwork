@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.config;
 
 import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
+import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.Arrays;
@@ -9,6 +10,7 @@ import java.util.List;
 public final class ClientConfig {
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.BooleanValue ENABLED;
+    private static final ModConfigSpec.EnumValue<TransportProtocol> TRANSPORT;
     private static final ModConfigSpec.ConfigValue<List<? extends String>> ALLOWED_SERVERS;
     private static final ModConfigSpec.IntValue TARGET_PORT;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
@@ -17,11 +19,14 @@ public final class ClientConfig {
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        builder.comment("MiguelNetwork client-side WSS transport settings.");
+        builder.comment("MiguelNetwork client-side WebSocket transport settings.");
         ENABLED = builder.comment("Master client switch. An empty allowlist still routes nothing.")
                 .define("enabled", false);
+        TRANSPORT = builder.comment(
+                        "WebSocket transport. WSS is the secure default; WS sends tunnel traffic without TLS.")
+                .defineEnum("transport", TransportProtocol.WSS);
         ALLOWED_SERVERS = builder.comment(
-                        "Minecraft server addresses that should use WSS.",
+                        "Minecraft server addresses that should use the configured WebSocket transport.",
                         "Entries may be host, host:port, [IPv6]:port, *.example.com, or * for every server.")
                 .defineListAllowEmpty("allowedServers", List.of(), () -> "mc.example.com:25565",
                         ClientConfig::isNonBlankString);
@@ -43,6 +48,10 @@ public final class ClientConfig {
 
     public static boolean enabled() {
         return booleanProperty("miguelnetwork.client.enabled", ENABLED.get());
+    }
+
+    public static TransportProtocol transport() {
+        return TransportProtocol.property("miguelnetwork.client.transport", TRANSPORT.get());
     }
 
     public static boolean allows(String host, int port) {

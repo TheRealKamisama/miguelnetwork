@@ -12,6 +12,8 @@
 - Infer the server tunnel target from the actual Minecraft listener when `targetPort` is zero.
 - Add normal game/JVM shutdown cleanup for bundled wstunnel processes.
 - Retain explicit, warning-heavy self-signed TLS switches for isolated development only.
+- Add explicit plain WS transport for isolated tests and TLS-terminating reverse-proxy deployments; WSS remains the
+  default.
 - Document installation-time configuration and the completed end-to-end WSS validation.
 
 ## 0.0.1-tech-preview

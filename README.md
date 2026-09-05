@@ -1,7 +1,10 @@
 # MiguelNetwork
 
-Minecraft Mod for carrying Minecraft Java Edition TCP traffic over WSS by managing a bundled
+Minecraft Mod for carrying Minecraft Java Edition TCP traffic over WebSocket by managing a bundled
 [wstunnel](https://github.com/erebe/wstunnel) sidecar.
+
+WSS is the secure default. Explicit plain WS support is available for isolated testing and for a server-side listener
+placed behind a TLS-terminating reverse proxy.
 
 Current target: Minecraft 1.21.1 + NeoForge 21.1.77 + Java 21.
 
