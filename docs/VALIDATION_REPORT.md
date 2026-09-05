@@ -44,8 +44,8 @@ Date: 2026-09-05
 - The local WSS test used wstunnel's built-in self-signed certificate and the new explicit development-only client
   bypass. Secure defaults remain unchanged: client certificate verification is enabled by default, and server startup
   requires configured certificate files unless built-in self-signed mode is explicitly allowed.
-- The resulting technical-preview JAR is 9,949,673 bytes with SHA-256
-  `d20a0bf823c67caa4a165f56c6d6b3007223f3fb2fd1460d4ce3adaa05f4cc1b`.
+- The WS-capable technical-preview JAR is 9,966,544 bytes with SHA-256
+  `8d9ae26a230454f3e1a434fe92735ec4e499442783a8702440905932891f1dc6`.
 
 ## Defect found during validation
 
@@ -67,16 +67,31 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - Review identified that a single global client sidecar would make concurrent status Pings for different WSS servers
   interrupt each other. Phase 1 now retains one sidecar per endpoint with a configurable, LRU-bounded process limit.
 
+## Cross-host Linux WS validation
+
+- An isolated production-style server was installed in an Ubuntu 22.04 x86-64 LXC container using Minecraft 1.21.1,
+  NeoForge 21.1.77 and Zulu Java 21.0.12.1. Its mod list contained only Minecraft, NeoForge and MiguelNetwork.
+- The dedicated server bound Minecraft to `127.0.0.1:25566`. MiguelNetwork extracted and launched the embedded Linux
+  wstunnel v10.7.1 binary as an unencrypted WS listener on `0.0.0.0:25565`.
+- A wstunnel client on a separate Windows host connected across the LAN to `ws://192.168.0.146:25565`. A real Minecraft
+  status Ping crossed that tunnel and returned Minecraft `1.21.1`, protocol `767`, the configured MOTD and an empty
+  player list.
+- Server logs independently recorded the remote peer, matched the `MiguelNetwork Minecraft only` restriction, and
+  opened only the permitted TCP destination `127.0.0.1:25566`.
+- This proves the cross-platform Windows-client/Linux-server WS transport and Linux bundled-binary extraction. Public
+  NAT traversal, login and gameplay remain to be exercised before treating the public WS experiment as complete.
+
 ## Not yet verified
 
 - Certificate success/failure behavior against a publicly trusted certificate.
-- Linux execution on a Linux host.
 - A separate UDP denial case; the current strict rule only declares `Tcp` and the wrong TCP destination was verified.
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
+- Public-internet status Ping, login, gameplay and reconnect behavior.
 
 ## Current interpretation
 
 The sidecar transport, binary packaging, NeoForge build and chosen central connection hook are technically viable. A
-real Minecraft status Ping, login and playable session have crossed WSS twice. Phase 0 has therefore validated the core
-architecture; public-certificate and cross-platform validation remain before a production-ready release.
+real Minecraft status Ping, login and playable session have crossed WSS twice, and a cross-host status Ping has crossed
+plain WS between Windows and Linux. Phase 0 has therefore validated the core architecture; public-internet gameplay,
+trusted-certificate and broader compatibility validation remain before a production-ready release.
