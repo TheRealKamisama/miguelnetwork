@@ -1,5 +1,7 @@
 # Third-party notices
 
+MiguelNetwork itself is licensed under the Apache License 2.0. The component below retains its own license.
+
 ## wstunnel
 
 MiguelNetwork includes unmodified executable builds from
@@ -9,4 +11,3 @@ Copyright (c) 2016-2024, Erèbe - Romain Gerard.
 
 wstunnel is distributed under the BSD 3-Clause License. The complete license text is included at
 `META-INF/licenses/wstunnel-BSD-3-Clause.txt` in the MiguelNetwork JAR.
-

@@ -10,3 +10,6 @@ default. Client routing is opt-in per server through an allowlist. See `docs/CON
 
 The completed Phase 0 evidence and remaining platform gaps are recorded in `docs/VALIDATION_REPORT.md`. Development
 and system-property overrides are described in `docs/TECHNICAL_VALIDATION.md`.
+
+MiguelNetwork is licensed under Apache-2.0. The bundled wstunnel executable remains under BSD-3-Clause; see
+`THIRD_PARTY_NOTICES.md`.
