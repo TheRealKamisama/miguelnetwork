@@ -78,8 +78,11 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
   player list.
 - Server logs independently recorded the remote peer, matched the `MiguelNetwork Minecraft only` restriction, and
   opened only the permitted TCP destination `127.0.0.1:25566`.
-- This proves the cross-platform Windows-client/Linux-server WS transport and Linux bundled-binary extraction. Public
-  NAT traversal, login and gameplay remain to be exercised before treating the public WS experiment as complete.
+- The WS listener was then moved to TCP port 35548 and exposed by the site's public hostname through the gateway's
+  matching TCP port mapping. A status Ping through that public endpoint succeeded from inside the LAN via NAT loopback.
+- This proves the cross-platform Windows-client/Linux-server WS transport, Linux bundled-binary extraction, and the
+  configured public endpoint's loopback path. A genuinely external login and gameplay session remain to be exercised
+  before treating the public WS experiment as complete.
 
 ## Not yet verified
 
@@ -87,7 +90,7 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - A separate UDP denial case; the current strict rule only declares `Tcp` and the wrong TCP destination was verified.
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
-- Public-internet status Ping, login, gameplay and reconnect behavior.
+- Public-internet login, gameplay and reconnect behavior from a genuinely external network.
 
 ## Current interpretation
 
