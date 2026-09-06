@@ -41,11 +41,21 @@ public final class ZstdNetClientCompatibility {
         return result;
     }
 
-    public static Optional<ServerAddress> tryIntercept(ServerAddress original, ServerData serverData) {
-        if (original == null || !isSupported() || isLoopback(original.getHost())) {
+    public static Optional<ServerAddress> tryIntercept(
+            ServerAddress original,
+            ServerData serverData,
+            boolean zstdNetBypassing
+    ) {
+        if (original == null || !isSupported()) {
             return Optional.empty();
         }
-        InetSocketAddress logical = InetSocketAddress.createUnresolved(original.getHost(), original.getPort());
+        ServerAddress logicalAddress = logicalAddress(original, serverData, zstdNetBypassing).orElse(null);
+        if (logicalAddress == null) {
+            return Optional.empty();
+        }
+        InetSocketAddress logical = InetSocketAddress.createUnresolved(
+                logicalAddress.getHost(), logicalAddress.getPort()
+        );
         Optional<ClientTunnelManager.PreparedTunnel> prepared = ClientTunnelManager.prepareForZstdNet(logical);
         if (prepared.isEmpty()) {
             return Optional.empty();
@@ -53,17 +63,18 @@ public final class ZstdNetClientCompatibility {
 
         Object proxy = null;
         try {
-            proxy = startProxy(prepared.get().address(), original);
+            proxy = startProxy(prepared.get().address(), logicalAddress);
             int localPort = (Integer) proxy.getClass().getMethod("localPort").invoke(proxy);
             ServerAddress localAddress = ServerAddress.parseString("127.0.0.1:" + localPort);
             publishProxyHandle(proxy);
             ClientTunnelManager.registerInternalLoopbackPort(localPort);
             if (serverData != null) {
-                serverData.ip = formatHostPort(original.getHost(), original.getPort());
+                serverData.ip = formatHostPort(logicalAddress.getHost(), logicalAddress.getPort());
             }
             MiguelNetwork.LOGGER.info(
                     "MiguelNetwork composed ZstdNet -> {} -> route {} for {}",
-                    prepared.get().address(), prepared.get().route().id(), serverData == null ? original : serverData.ip
+                    prepared.get().address(), prepared.get().route().id(),
+                    serverData == null ? logicalAddress : serverData.ip
             );
             return Optional.of(localAddress);
         } catch (ReflectiveOperationException | RuntimeException exception) {
@@ -74,6 +85,22 @@ public final class ZstdNetClientCompatibility {
             );
             return Optional.empty();
         }
+    }
+
+    private static Optional<ServerAddress> logicalAddress(
+            ServerAddress original,
+            ServerData serverData,
+            boolean zstdNetBypassing
+    ) {
+        if (!isLoopback(original.getHost())) {
+            return Optional.of(original);
+        }
+        if (!zstdNetBypassing || serverData == null || serverData.ip == null
+                || !ServerAddress.isValidAddress(serverData.ip)) {
+            return Optional.empty();
+        }
+        ServerAddress restored = ServerAddress.parseString(serverData.ip);
+        return isLoopback(restored.getHost()) ? Optional.empty() : Optional.of(restored);
     }
 
     private static void closeQuietly(Object proxy) {

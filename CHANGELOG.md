@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.0-alpha.5
+
+- Compose ZstdNet's primary server-list UI path, which enters its connection hook with an existing loopback proxy and
+  the bypass flag set.
+- Recover the logical server address from `ServerData`, replace the premature direct proxy and clear the consumed
+  ZstdNet bypass state.
+
 ## 0.1.0-alpha.4
 
 - Fix ZstdNet composition on NeoForge by injecting directly into its optional connection hook.
