@@ -48,6 +48,18 @@ final class ClientTransportProbe {
         return Optional.empty();
     }
 
+    static Optional<TransportProtocol> detectOnly(
+            String host,
+            int publicPort,
+            int targetPort,
+            String pathPrefix,
+            Duration timeout,
+            TransportProtocol transport
+    ) {
+        return probe(host, publicPort, targetPort, pathPrefix, timeout, transport)
+                ? Optional.of(transport) : Optional.empty();
+    }
+
     private static boolean probe(
             String host,
             int publicPort,

@@ -10,6 +10,8 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.fml.loading.FMLEnvironment;
+import net.neoforged.api.distmarker.Dist;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.GameShuttingDownEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -45,7 +47,9 @@ public final class MiguelNetwork {
     }
 
     private static void stopSidecars() {
-        ClientTunnelManager.stop();
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            ClientTunnelManager.stop();
+        }
         ServerTunnelController.stop();
     }
 }

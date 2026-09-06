@@ -4,10 +4,10 @@
   "package": "io.github.therealkamisama.miguelnetwork.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "ConnectionMixin"
+    "ConnectionMixin",
+    "ConnectScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
   }
 }
-

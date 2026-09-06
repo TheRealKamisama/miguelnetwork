@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.0-alpha.3
+
+- Add signed MiguelNetwork Discovery Protocol v1 with dynamic per-server transport, public endpoint, path and target port.
+- Persist Ed25519 server identity, client key pins, monotonic configuration epochs and a WSS downgrade floor.
+- Add a loopback Discovery HTTP service designed for TLS/path multiplexing through Nginx.
+- Compose ZstdNet 1.4.7 compressed streams with MiguelNetwork without modifying or reimplementing ZstdNet.
+- Advertise separate ZstdNet and raw Minecraft routes and restrict wstunnel to both detected loopback targets.
+
 ## 0.1.0-alpha.2
 
 - Remove client-side server allowlists and explicit WSS/WS selection from normal TOML configuration.

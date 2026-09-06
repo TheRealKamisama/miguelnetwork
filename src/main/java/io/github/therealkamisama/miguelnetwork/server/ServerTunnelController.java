@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.server;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
+import io.github.therealkamisama.miguelnetwork.compat.ZstdNetServerCompatibility;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
@@ -15,9 +16,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.OptionalInt;
 
 public final class ServerTunnelController {
     private static ManagedWstunnelProcess process;
+    private static DiscoveryHttpServer discoveryServer;
 
     private ServerTunnelController() {
     }
@@ -31,14 +36,12 @@ public final class ServerTunnelController {
         try {
             int publicPort = ServerConfig.publicPort();
             int targetPort = ServerConfig.targetPort(server.getPort());
-            if (targetPort != MiguelNetworkProtocol.MINECRAFT_TARGET_PORT) {
-                MiguelNetwork.LOGGER.warn(
-                        "MiguelNetwork clients use protocol target port {}, but this server targets {}. "
-                                + "Use server-port={} unless both sides intentionally use the development override.",
-                        MiguelNetworkProtocol.MINECRAFT_TARGET_PORT,
-                        targetPort,
-                        MiguelNetworkProtocol.MINECRAFT_TARGET_PORT
-                );
+            OptionalInt detectedZstdPort = ZstdNetServerCompatibility.discoverListenPort();
+            Integer zstdPort = detectedZstdPort.isPresent() ? detectedZstdPort.getAsInt() : null;
+            List<Integer> allowedTargetPorts = new ArrayList<>();
+            allowedTargetPorts.add(targetPort);
+            if (zstdPort != null && zstdPort != targetPort) {
+                allowedTargetPorts.add(zstdPort);
             }
             String bindHost = ServerConfig.bindHost();
             String pathPrefix = ServerConfig.pathPrefix();
@@ -47,7 +50,7 @@ public final class ServerTunnelController {
             Path executable = NativeWstunnel.resolve(gameDirectory);
             Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
             Files.createDirectories(generated.getParent());
-            Files.write(generated, restrictions(pathPrefix, targetPort).getBytes(StandardCharsets.UTF_8));
+            Files.write(generated, restrictions(pathPrefix, allowedTargetPorts).getBytes(StandardCharsets.UTF_8));
 
             Path certificate;
             Path privateKey;
@@ -86,6 +89,13 @@ public final class ServerTunnelController {
             process.awaitReady(Duration.ofSeconds(10));
             MiguelNetwork.LOGGER.info("MiguelNetwork {} listener is ready on {}:{} -> 127.0.0.1:{}",
                     transport, bindHost, publicPort, targetPort);
+            if (ServerConfig.discoveryEnabled()) {
+                discoveryServer = DiscoveryHttpServer.start(gameDirectory, targetPort, zstdPort);
+                MiguelNetwork.LOGGER.info(
+                        "MiguelNetwork Discovery is ready on http://{}:{}{}",
+                        ServerConfig.discoveryBindHost(), ServerConfig.discoveryPort(), MiguelNetworkProtocol.DISCOVERY_PATH
+                );
+            }
         } catch (Exception exception) {
             stop();
             MiguelNetwork.LOGGER.error("MiguelNetwork server tunnel failed to start", exception);
@@ -101,25 +111,40 @@ public final class ServerTunnelController {
     }
 
     static String restrictions(String pathPrefix, int targetPort) {
+        return restrictions(pathPrefix, List.of(targetPort));
+    }
+
+    static String restrictions(String pathPrefix, List<Integer> targetPorts) {
         String escapedPrefix = pathPrefix.replace("\\", "\\\\").replace("\"", "\\\"");
-        return "restrictions:\n"
-                + "  - name: \"MiguelNetwork Minecraft only\"\n"
-                + "    description: \"Only TCP forwarding to the loopback Minecraft listener\"\n"
-                + "    match:\n"
-                + "      - !PathPrefix \"^" + escapedPrefix + "$\"\n"
-                + "    allow:\n"
-                + "      - !Tunnel\n"
-                + "        protocol:\n"
-                + "          - Tcp\n"
-                + "        port:\n"
-                + "          - \"" + targetPort + "\"\n"
-                + "        host: \"^$\"\n"
-                + "        cidr:\n"
-                + "          - \"127.0.0.1/32\"\n"
-                + "          - \"::1/128\"\n";
+        StringBuilder result = new StringBuilder("restrictions:\n")
+                .append("  - name: \"MiguelNetwork Minecraft only\"\n")
+                .append("    description: \"Only TCP forwarding to approved loopback listeners\"\n")
+                .append("    match:\n")
+                .append("      - !PathPrefix \"^").append(escapedPrefix).append("$\"\n")
+                .append("    allow:\n")
+                .append("      - !Tunnel\n")
+                .append("        protocol:\n")
+                .append("          - Tcp\n")
+                .append("        port:\n");
+        for (int targetPort : targetPorts.stream().distinct().toList()) {
+            if (targetPort < 1 || targetPort > 65535) {
+                throw new IllegalArgumentException("Invalid target port " + targetPort);
+            }
+            result.append("          - \"").append(targetPort).append("\"\n");
+        }
+        return result
+                .append("        host: \"^$\"\n")
+                .append("        cidr:\n")
+                .append("          - \"127.0.0.1/32\"\n")
+                .append("          - \"::1/128\"\n")
+                .toString();
     }
 
     public static synchronized void stop() {
+        if (discoveryServer != null) {
+            discoveryServer.close();
+            discoveryServer = null;
+        }
         if (process != null) {
             process.close();
             process = null;

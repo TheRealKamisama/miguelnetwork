@@ -12,6 +12,7 @@ public final class ClientConfig {
     private static final ModConfigSpec.BooleanValue ENABLED;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
     private static final ModConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
+    private static final ModConfigSpec.BooleanValue LEGACY_FALLBACK;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -24,6 +25,9 @@ public final class ClientConfig {
         MAX_TUNNEL_PROCESSES = builder.comment(
                         "Maximum simultaneous per-endpoint wstunnel processes. Least-recently-used entries are evicted.")
                 .defineInRange("maxTunnelProcesses", 8, 1, 32);
+        LEGACY_FALLBACK = builder.comment(
+                        "Try the alpha.2 WSS/WS/TCP probe when signed Discovery is unavailable for a new server.")
+                .define("legacyFallback", true);
         SPEC = builder.build();
     }
 
@@ -57,6 +61,10 @@ public final class ClientConfig {
     public static int maxTunnelProcesses() {
         int configured = Integer.getInteger("miguelnetwork.client.maxTunnelProcesses", MAX_TUNNEL_PROCESSES.get());
         return Math.max(1, Math.min(32, configured));
+    }
+
+    public static boolean legacyFallback() {
+        return booleanProperty("miguelnetwork.client.legacyFallback", LEGACY_FALLBACK.get());
     }
 
     private static boolean booleanProperty(String name, boolean fallback) {
