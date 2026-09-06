@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0-alpha.4
+
+- Fix ZstdNet composition on NeoForge by injecting directly into its optional connection hook.
+- Stop depending on the undefined transformation order between ZstdNet's coremod and MiguelNetwork's mixins.
+
 ## 0.1.0-alpha.3
 
 - Add signed MiguelNetwork Discovery Protocol v1 with dynamic per-server transport, public endpoint, path and target port.

@@ -5,7 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "client": [
     "ConnectionMixin",
-    "ConnectScreenMixin"
+    "ZstdNetConnectScreenHooksMixin"
   ],
   "injectors": {
     "defaultRequire": 1

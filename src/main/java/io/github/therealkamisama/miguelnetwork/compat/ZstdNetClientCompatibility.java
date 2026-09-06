@@ -41,14 +41,14 @@ public final class ZstdNetClientCompatibility {
         return result;
     }
 
-    public static ServerAddress intercept(ServerAddress original, ServerData serverData) {
+    public static Optional<ServerAddress> tryIntercept(ServerAddress original, ServerData serverData) {
         if (original == null || !isSupported() || isLoopback(original.getHost())) {
-            return invokeOriginal(original, serverData);
+            return Optional.empty();
         }
         InetSocketAddress logical = InetSocketAddress.createUnresolved(original.getHost(), original.getPort());
         Optional<ClientTunnelManager.PreparedTunnel> prepared = ClientTunnelManager.prepareForZstdNet(logical);
         if (prepared.isEmpty()) {
-            return invokeOriginal(original, serverData);
+            return Optional.empty();
         }
 
         Object proxy = null;
@@ -65,14 +65,14 @@ public final class ZstdNetClientCompatibility {
                     "MiguelNetwork composed ZstdNet -> {} -> route {} for {}",
                     prepared.get().address(), prepared.get().route().id(), serverData == null ? original : serverData.ip
             );
-            return localAddress;
+            return Optional.of(localAddress);
         } catch (ReflectiveOperationException | RuntimeException exception) {
             closeQuietly(proxy);
             MiguelNetwork.LOGGER.warn(
                     "MiguelNetwork could not compose the supported ZstdNet adapter; using ZstdNet's original path",
                     unwrap(exception)
             );
-            return invokeOriginal(original, serverData);
+            return Optional.empty();
         }
     }
 
@@ -125,20 +125,6 @@ public final class ZstdNetClientCompatibility {
                 }
             }
             proxyField.set(null, proxy);
-        }
-    }
-
-    private static ServerAddress invokeOriginal(ServerAddress original, ServerData serverData) {
-        if (!ModList.get().isLoaded("zstdnet")) {
-            return original;
-        }
-        try {
-            Class<?> hooks = Class.forName(HOOKS);
-            return (ServerAddress) hooks.getMethod("interceptConnect", ServerAddress.class, ServerData.class)
-                    .invoke(null, original, serverData);
-        } catch (ReflectiveOperationException exception) {
-            MiguelNetwork.LOGGER.warn("Cannot invoke ZstdNet's original connection hook", unwrap(exception));
-            return original;
         }
     }
 

@@ -1,6 +1,6 @@
 # ZstdNet compatibility
 
-MiguelNetwork `0.1.0-alpha.3` contains a unilateral compatibility adapter for ZstdNet `1.4.7` on Minecraft 1.21.1
+MiguelNetwork `0.1.0-alpha.4` contains a unilateral compatibility adapter for ZstdNet `1.4.7` on Minecraft 1.21.1
 NeoForge. ZstdNet itself and its JAR are not modified, and no Zstd compression code is copied.
 
 ## Byte-stream composition
@@ -26,10 +26,11 @@ adds that port to the generated wstunnel restriction, and advertises a higher-pr
 usable MiguelNetwork route.
 
 On the client, ZstdNet 1.4.7's coremod normally creates its loopback proxy before Minecraft reaches
-`Connection.connect`. MiguelNetwork redirects that hook only when present, creates the wstunnel route first, invokes
-ZstdNet's public `LocalZstdNet.start(...)` API reflectively, and publishes the returned handle back to ZstdNet so its
-normal UI/login/logout lifecycle remains responsible for closing it. The one subsequent loopback connection is marked
-as internal to prevent double tunnelling.
+`Connection.connect`. MiguelNetwork uses an optional pseudo-mixin on ZstdNet's hook class, creates the wstunnel route
+first, invokes ZstdNet's public `LocalZstdNet.start(...)` API reflectively, and publishes the returned handle back to
+ZstdNet so its normal UI/login/logout lifecycle remains responsible for closing it. Injecting into the hook class
+avoids relying on transformation order between ZstdNet's coremod and MiguelNetwork's mixins. The one subsequent
+loopback connection is marked as internal to prevent double tunnelling.
 
 ## Version and failure policy
 
