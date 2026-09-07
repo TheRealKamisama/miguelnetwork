@@ -26,6 +26,7 @@ class DiscoveryCodecTest {
 
         assertEquals(manifest, decoded.manifest());
         assertArrayEquals(pair.getPublic().getEncoded(), decoded.publicKey().getEncoded());
+        assertEquals("192.168.0.146", decoded.manifest().routes().getFirst().wstunnelTargetHost());
         assertEquals(25573, decoded.manifest().routes().getFirst().wstunnelTargetPort());
     }
 
@@ -41,6 +42,17 @@ class DiscoveryCodecTest {
         byte[] tampered = (json.substring(0, payloadStart) + replacement + json.substring(payloadStart + 1)).getBytes();
 
         assertThrows(GeneralSecurityException.class, () -> DiscoveryCodec.decodeAndVerify(tampered));
+    }
+
+    @Test
+    void roundTripsUnsignedManifestWhenVerificationIsOptional() throws Exception {
+        KeyPair pair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair();
+        DiscoveryManifest manifest = manifest(pair, 1, "nonce-value");
+
+        assertEquals(manifest, DiscoveryCodec.decodeWithoutSignatureVerification(
+                DiscoveryCodec.encodeUnsigned(manifest)));
+        assertThrows(GeneralSecurityException.class,
+                () -> DiscoveryCodec.decodeAndVerify(DiscoveryCodec.encodeUnsigned(manifest)));
     }
 
     @Test
@@ -63,7 +75,7 @@ class DiscoveryCodecTest {
                 now + 120,
                 List.of(new DiscoveryRoute(
                         "zstdnet-primary", TransportProtocol.WSS, "edge.example.test", 443,
-                        "miguelnetwork-v1", 25573, 200,
+                        "miguelnetwork-v1", "192.168.0.146", 25573, 200,
                         List.of(new DiscoveryFilter(MiguelNetworkProtocol.ZSTDNET_FILTER, 1, true))
                 )),
                 DiscoveryCodec.keyId(pair.getPublic())

@@ -2,6 +2,7 @@ package io.github.therealkamisama.miguelnetwork.server;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.compat.ZstdNetServerCompatibility;
+import io.github.therealkamisama.miguelnetwork.config.DeploymentMode;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
@@ -12,6 +13,8 @@ import net.minecraft.server.MinecraftServer;
 import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.net.ServerSocket;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +26,7 @@ import java.util.OptionalInt;
 public final class ServerTunnelController {
     private static ManagedWstunnelProcess process;
     private static DiscoveryHttpServer discoveryServer;
+    private static StandaloneGateway standaloneGateway;
 
     private ServerTunnelController() {
     }
@@ -34,67 +38,32 @@ public final class ServerTunnelController {
         }
         stop();
         try {
-            int publicPort = ServerConfig.publicPort();
-            int targetPort = ServerConfig.targetPort(server.getPort());
-            OptionalInt detectedZstdPort = ZstdNetServerCompatibility.discoverListenPort();
-            Integer zstdPort = detectedZstdPort.isPresent() ? detectedZstdPort.getAsInt() : null;
-            List<Integer> allowedTargetPorts = new ArrayList<>();
-            allowedTargetPorts.add(targetPort);
-            if (zstdPort != null && zstdPort != targetPort) {
-                allowedTargetPorts.add(zstdPort);
-            }
-            String bindHost = ServerConfig.bindHost();
-            String pathPrefix = ServerConfig.pathPrefix();
-            TransportProtocol transport = ServerConfig.transport();
             Path gameDirectory = FMLPaths.GAMEDIR.get();
+            OptionalInt detectedZstdPort = ZstdNetServerCompatibility.discoverListenPort();
+            ServerEndpointResolver.ResolvedEndpoints endpoints = ServerEndpointResolver.resolve(
+                    gameDirectory, server.getPort(), detectedZstdPort);
+            validatePorts(endpoints);
+
+            List<Integer> allowedTargetPorts = new ArrayList<>();
+            allowedTargetPorts.add(endpoints.minecraftPort());
+            if (endpoints.zstdNetPort() != null && endpoints.zstdNetPort() != endpoints.minecraftPort()) {
+                allowedTargetPorts.add(endpoints.zstdNetPort());
+            }
             Path executable = NativeWstunnel.resolve(gameDirectory);
             Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
             Files.createDirectories(generated.getParent());
-            Files.write(generated, restrictions(pathPrefix, allowedTargetPorts).getBytes(StandardCharsets.UTF_8));
+            Files.writeString(generated,
+                    restrictions(ServerConfig.pathPrefix(), endpoints.targetHost(), allowedTargetPorts),
+                    StandardCharsets.UTF_8);
+            ServerEndpointResolver.writeDetectedConfiguration(
+                    gameDirectory, endpoints, ServerConfig.mode(), ServerConfig.bindHost(), ServerConfig.publicPort());
 
-            Path certificate;
-            Path privateKey;
-            String certificateValue = ServerConfig.certificate();
-            String privateKeyValue = ServerConfig.privateKey();
-            if (!transport.usesTls()) {
-                certificate = null;
-                privateKey = null;
-                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                MiguelNetwork.LOGGER.warn("MiguelNetwork SERVER TRANSPORT IS UNENCRYPTED WS");
-                MiguelNetwork.LOGGER.warn("Use this only behind a TLS reverse proxy or for an isolated test");
-                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            } else if (certificateValue.isEmpty() && privateKeyValue.isEmpty()) {
-                boolean allowBuiltInSelfSigned = ServerConfig.allowBuiltInSelfSigned();
-                if (!allowBuiltInSelfSigned) {
-                    throw new IOException("Missing TLS certificate and private key. For local development only, set "
-                            + "-Dmiguelnetwork.tls.allowBuiltInSelfSigned=true");
-                }
-                certificate = null;
-                privateKey = null;
-                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-                MiguelNetwork.LOGGER.warn("MiguelNetwork IS USING WSTUNNEL'S BUILT-IN SELF-SIGNED CERTIFICATE (DEVELOPMENT ONLY)");
-                MiguelNetwork.LOGGER.warn("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-            } else if (certificateValue.isEmpty() || privateKeyValue.isEmpty()) {
-                throw new IOException("Both -Dmiguelnetwork.tls.certificate and -Dmiguelnetwork.tls.privateKey are required");
+            DiscoveryDocumentProvider documents = ServerConfig.discoveryEnabled()
+                    ? DiscoveryDocumentProvider.create(gameDirectory, endpoints) : null;
+            if (ServerConfig.mode() == DeploymentMode.STANDALONE) {
+                startStandalone(executable, generated, documents, endpoints);
             } else {
-                certificate = requiredPath("miguelnetwork.tls.certificate", certificateValue);
-                privateKey = requiredPath("miguelnetwork.tls.privateKey", privateKeyValue);
-            }
-            process = ManagedWstunnelProcess.start(
-                    WstunnelCommands.server(executable, bindHost, publicPort, generated, transport,
-                            certificate, privateKey),
-                    line -> line.contains("Starting wstunnel server listening on"),
-                    MiguelNetwork.LOGGER
-            );
-            process.awaitReady(Duration.ofSeconds(10));
-            MiguelNetwork.LOGGER.info("MiguelNetwork {} listener is ready on {}:{} -> 127.0.0.1:{}",
-                    transport, bindHost, publicPort, targetPort);
-            if (ServerConfig.discoveryEnabled()) {
-                discoveryServer = DiscoveryHttpServer.start(gameDirectory, targetPort, zstdPort);
-                MiguelNetwork.LOGGER.info(
-                        "MiguelNetwork Discovery is ready on http://{}:{}{}",
-                        ServerConfig.discoveryBindHost(), ServerConfig.discoveryPort(), MiguelNetworkProtocol.DISCOVERY_PATH
-                );
+                startExternalProxy(executable, generated, documents, endpoints);
             }
         } catch (Exception exception) {
             stop();
@@ -102,23 +71,98 @@ public final class ServerTunnelController {
         }
     }
 
-    private static Path requiredPath(String property, String value) throws IOException {
-        Path path = Path.of(value).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(path)) {
-            throw new IOException("Configured file does not exist: " + path);
+    private static void startStandalone(
+            Path executable,
+            Path restrictions,
+            DiscoveryDocumentProvider documents,
+            ServerEndpointResolver.ResolvedEndpoints endpoints
+    ) throws Exception {
+        int sidecarPort = findCandidatePort();
+        process = ManagedWstunnelProcess.start(
+                WstunnelCommands.server(executable, "127.0.0.1", sidecarPort, restrictions,
+                        TransportProtocol.WS, null, null),
+                line -> line.contains("Starting wstunnel server listening on"),
+                MiguelNetwork.LOGGER
+        );
+        process.awaitReady(Duration.ofSeconds(10));
+        standaloneGateway = StandaloneGateway.start(
+                ServerConfig.bindHost(), ServerConfig.publicPort(), "127.0.0.1", sidecarPort,
+                documents == null ? null : documents::response
+        );
+        MiguelNetwork.LOGGER.info(
+                "MiguelNetwork standalone WS gateway is ready on {}:{}; Discovery and wstunnel share one port",
+                ServerConfig.bindHost(), ServerConfig.publicPort());
+        logDetectedEndpoints(endpoints);
+    }
+
+    private static void startExternalProxy(
+            Path executable,
+            Path restrictions,
+            DiscoveryDocumentProvider documents,
+            ServerEndpointResolver.ResolvedEndpoints endpoints
+    ) throws Exception {
+        process = ManagedWstunnelProcess.start(
+                WstunnelCommands.server(executable, ServerConfig.bindHost(), ServerConfig.publicPort(), restrictions,
+                        TransportProtocol.WS, null, null),
+                line -> line.contains("Starting wstunnel server listening on"),
+                MiguelNetwork.LOGGER
+        );
+        process.awaitReady(Duration.ofSeconds(10));
+        MiguelNetwork.LOGGER.info("MiguelNetwork private WS upstream is ready on {}:{}",
+                ServerConfig.bindHost(), ServerConfig.publicPort());
+        if (documents != null) {
+            discoveryServer = DiscoveryHttpServer.start(documents);
+            MiguelNetwork.LOGGER.info("MiguelNetwork private Discovery upstream is ready on http://{}:{}{}",
+                    ServerConfig.discoveryBindHost(), ServerConfig.discoveryPort(),
+                    MiguelNetworkProtocol.DISCOVERY_PATH);
         }
-        return path;
+        logDetectedEndpoints(endpoints);
+    }
+
+    private static void logDetectedEndpoints(ServerEndpointResolver.ResolvedEndpoints endpoints) {
+        MiguelNetwork.LOGGER.info("MiguelNetwork detected Minecraft target {}:{} from server.properties/runtime",
+                endpoints.targetHost(), endpoints.minecraftPort());
+        if (endpoints.zstdNetPort() != null) {
+            MiguelNetwork.LOGGER.info("MiguelNetwork advertises detected ZstdNet target {}:{}",
+                    endpoints.targetHost(), endpoints.zstdNetPort());
+        }
+        MiguelNetwork.LOGGER.info("MiguelNetwork Discovery signatures are {}",
+                ServerConfig.signDiscoveryResponses() ? "enabled" : "disabled");
+    }
+
+    private static void validatePorts(ServerEndpointResolver.ResolvedEndpoints endpoints) throws IOException {
+        if (ServerConfig.publicPort() == endpoints.minecraftPort()
+                || endpoints.zstdNetPort() != null && ServerConfig.publicPort() == endpoints.zstdNetPort()) {
+            throw new IOException("MiguelNetwork publicPort must differ from the Minecraft and ZstdNet listener ports");
+        }
+        if (ServerConfig.mode() == DeploymentMode.EXTERNAL_PROXY && ServerConfig.discoveryEnabled()
+                && ServerConfig.publicPort() == ServerConfig.discoveryPort()
+                && ServerConfig.bindHost().equalsIgnoreCase(ServerConfig.discoveryBindHost())) {
+            throw new IOException("External-proxy wstunnel and Discovery upstreams cannot bind the same address/port");
+        }
+    }
+
+    private static int findCandidatePort() throws IOException {
+        try (ServerSocket socket = new ServerSocket()) {
+            socket.bind(new InetSocketAddress("127.0.0.1", 0));
+            return socket.getLocalPort();
+        }
     }
 
     static String restrictions(String pathPrefix, int targetPort) {
-        return restrictions(pathPrefix, List.of(targetPort));
+        return restrictions(pathPrefix, "127.0.0.1", List.of(targetPort));
     }
 
     static String restrictions(String pathPrefix, List<Integer> targetPorts) {
-        String escapedPrefix = pathPrefix.replace("\\", "\\\\").replace("\"", "\\\"");
+        return restrictions(pathPrefix, "127.0.0.1", targetPorts);
+    }
+
+    static String restrictions(String pathPrefix, String targetHost, List<Integer> targetPorts) {
+        String escapedPrefix = yaml(regex(pathPrefix));
+        String normalizedTarget = stripBrackets(targetHost.trim());
         StringBuilder result = new StringBuilder("restrictions:\n")
                 .append("  - name: \"MiguelNetwork Minecraft only\"\n")
-                .append("    description: \"Only TCP forwarding to approved loopback listeners\"\n")
+                .append("    description: \"Only TCP forwarding to approved server listeners\"\n")
                 .append("    match:\n")
                 .append("      - !PathPrefix \"^").append(escapedPrefix).append("$\"\n")
                 .append("    allow:\n")
@@ -132,15 +176,45 @@ public final class ServerTunnelController {
             }
             result.append("          - \"").append(targetPort).append("\"\n");
         }
-        return result
-                .append("        host: \"^$\"\n")
+        String hostPattern = isIpLiteral(normalizedTarget) ? "^$" : "^" + regex(normalizedTarget) + "$";
+        result.append("        host: \"").append(yaml(hostPattern)).append("\"\n")
                 .append("        cidr:\n")
                 .append("          - \"127.0.0.1/32\"\n")
-                .append("          - \"::1/128\"\n")
-                .toString();
+                .append("          - \"::1/128\"\n");
+        if (isIpv4Literal(normalizedTarget) && !normalizedTarget.equals("127.0.0.1")) {
+            result.append("          - \"").append(normalizedTarget).append("/32\"\n");
+        } else if (normalizedTarget.indexOf(':') >= 0 && !normalizedTarget.equals("::1")) {
+            result.append("          - \"").append(normalizedTarget).append("/128\"\n");
+        }
+        return result.toString();
+    }
+
+    private static boolean isIpLiteral(String value) {
+        return isIpv4Literal(value) || value.indexOf(':') >= 0;
+    }
+
+    private static boolean isIpv4Literal(String value) {
+        return value.matches("(?:[0-9]{1,3}\\.){3}[0-9]{1,3}");
+    }
+
+    private static String stripBrackets(String value) {
+        return value.startsWith("[") && value.endsWith("]")
+                ? value.substring(1, value.length() - 1) : value;
+    }
+
+    private static String regex(String value) {
+        return value.replaceAll("([\\\\.\\[\\]{}()*+?^$|])", "\\\\$1");
+    }
+
+    private static String yaml(String value) {
+        return value.replace("\\", "\\\\").replace("\"", "\\\"");
     }
 
     public static synchronized void stop() {
+        if (standaloneGateway != null) {
+            standaloneGateway.close();
+            standaloneGateway = null;
+        }
         if (discoveryServer != null) {
             discoveryServer.close();
             discoveryServer = null;

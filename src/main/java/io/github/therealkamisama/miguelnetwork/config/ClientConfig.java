@@ -13,6 +13,9 @@ public final class ClientConfig {
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
     private static final ModConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
     private static final ModConfigSpec.BooleanValue LEGACY_FALLBACK;
+    private static final ModConfigSpec.BooleanValue VERIFY_DISCOVERY_SIGNATURES;
+    private static final ModConfigSpec.BooleanValue ENFORCE_WSS_DOWNGRADE_PROTECTION;
+    private static final ModConfigSpec.BooleanValue VERIFY_TLS_CERTIFICATES;
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
@@ -26,8 +29,21 @@ public final class ClientConfig {
                         "Maximum simultaneous per-endpoint wstunnel processes. Least-recently-used entries are evicted.")
                 .defineInRange("maxTunnelProcesses", 8, 1, 32);
         LEGACY_FALLBACK = builder.comment(
-                        "Try the alpha.2 WSS/WS/TCP probe when signed Discovery is unavailable for a new server.")
+                        "Try the legacy WSS/WS/TCP probe when Discovery is unavailable for a new server.")
                 .define("legacyFallback", true);
+        builder.push("security");
+        VERIFY_DISCOVERY_SIGNATURES = builder.comment(
+                        "Require Ed25519-signed Discovery documents and pin each server identity.",
+                        "Disabled by default; enable only together with discovery.signResponses on the server."
+                ).define("verifyDiscoverySignatures", false);
+        ENFORCE_WSS_DOWNGRADE_PROTECTION = builder.comment(
+                        "After a successful WSS connection, refuse later WS/TCP downgrade for that endpoint.",
+                        "Disabled by default so WSS remains an optional deployment choice."
+                ).define("enforceWssDowngradeProtection", false);
+        VERIFY_TLS_CERTIFICATES = builder.comment(
+                        "Verify the normal CA chain and hostname whenever a WSS route is selected."
+                ).define("verifyTlsCertificates", true);
+        builder.pop();
         SPEC = builder.build();
     }
 
@@ -47,7 +63,7 @@ public final class ClientConfig {
     }
 
     public static boolean verifyCertificate() {
-        return booleanProperty("miguelnetwork.tls.verify", true);
+        return booleanProperty("miguelnetwork.tls.verify", VERIFY_TLS_CERTIFICATES.get());
     }
 
     public static Optional<TransportProtocol> forcedTransport() {
@@ -65,6 +81,16 @@ public final class ClientConfig {
 
     public static boolean legacyFallback() {
         return booleanProperty("miguelnetwork.client.legacyFallback", LEGACY_FALLBACK.get());
+    }
+
+    public static boolean verifyDiscoverySignatures() {
+        return booleanProperty(
+                "miguelnetwork.discovery.verifySignatures", VERIFY_DISCOVERY_SIGNATURES.get());
+    }
+
+    public static boolean enforceWssDowngradeProtection() {
+        return booleanProperty(
+                "miguelnetwork.client.enforceWssDowngradeProtection", ENFORCE_WSS_DOWNGRADE_PROTECTION.get());
     }
 
     private static boolean booleanProperty(String name, boolean fallback) {

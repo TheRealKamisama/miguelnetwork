@@ -1,6 +1,6 @@
 # ZstdNet compatibility
 
-MiguelNetwork `0.1.0-alpha.5` contains a unilateral compatibility adapter for ZstdNet `1.4.7` on Minecraft 1.21.1
+MiguelNetwork `0.1.0-alpha.6` contains a unilateral compatibility adapter for ZstdNet `1.4.7` on Minecraft 1.21.1
 NeoForge. ZstdNet itself and its JAR are not modified, and no Zstd compression code is copied.
 
 ## Byte-stream composition
@@ -11,7 +11,7 @@ For login traffic, the resulting chain is:
 Minecraft client
   -> ZstdNet client loopback proxy
   -> MiguelNetwork/wstunnel client loopback listener
-  -> WSS
+  -> WS or WSS
   -> wstunnel server
   -> ZstdNet server listener
   -> Minecraft backend
@@ -40,8 +40,8 @@ The reflective adapter is enabled only when the installed Mod metadata version i
 classes, methods and fields are present. This narrow gate is deliberate because ZstdNet exposes no stable integration
 SPI for replacing the upstream address and adopting an externally created `ProxyHandle`.
 
-If the signed manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. A compatible
-raw route may still be selected. A signed manifest with no compatible route fails closed rather than connecting to an
+If a Discovery manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. A compatible
+raw route may still be selected. A manifest with no compatible route fails closed rather than connecting to an
 unadvertised backend. Unknown ZstdNet versions use their original hook and log a compatibility warning; they are not
 claimed as supported until their exact API has been tested.
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.0-alpha.6
+
+- Add `STANDALONE` and `EXTERNAL_PROXY` deployment modes.
+- Add a built-in plain-WS gateway that multiplexes Discovery and wstunnel on one public port.
+- Generate the dedicated-server config in `config/` and derive Minecraft target IP/port from `server.properties`.
+- Auto-detect supported ZstdNet and publish the resolved runtime endpoints in `generated/detected-server.toml`.
+- Make Discovery signing, WSS advertisement and persistent WSS downgrade enforcement optional and disabled by default.
+- Add `wstunnelTargetHost` to Discovery routes so explicitly bound Minecraft servers work without manual client config.
+
 ## 0.1.0-alpha.5
 
 - Compose ZstdNet's primary server-list UI path, which enters its connection hook with an existing loopback proxy and

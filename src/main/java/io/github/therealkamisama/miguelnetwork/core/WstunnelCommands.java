@@ -13,6 +13,7 @@ public final class WstunnelCommands {
             String host,
             int publicPort,
             int localPort,
+            String targetHost,
             int targetPort,
             String pathPrefix,
             TransportProtocol transport,
@@ -30,7 +31,7 @@ public final class WstunnelCommands {
         command.add("--http-upgrade-path-prefix");
         command.add(pathPrefix);
         command.add("-L");
-        command.add("tcp://127.0.0.1:" + localPort + ":127.0.0.1:" + targetPort);
+        command.add("tcp://127.0.0.1:" + localPort + ":" + formatHost(targetHost) + ":" + targetPort);
         command.add(transport.scheme() + "://" + formatHost(host) + ":" + publicPort);
         return command;
     }

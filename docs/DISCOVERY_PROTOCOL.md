@@ -1,13 +1,14 @@
 # MiguelNetwork Discovery Protocol v1
 
-Status: experimental, implemented by MiguelNetwork `0.1.0-alpha.3`.
+Status: experimental, implemented by MiguelNetwork `0.1.0-alpha.6`.
 
-The protocol lets a Minecraft client turn the address entered by the player into a per-server transport route. It is a
-control plane only: Minecraft and wstunnel data never pass through the Discovery HTTP handler.
+Discovery turns the logical Minecraft address entered by a player into a transport route. It is a control plane only:
+Minecraft and wstunnel stream bytes do not pass through the Discovery document generator. The same public port may be
+served by MiguelNetwork's standalone gateway or by an external reverse proxy.
 
 ## Exchange
 
-The client sends an HTTPS request to the same logical endpoint that the player entered:
+The client tries HTTPS and then HTTP on the logical endpoint:
 
 ```http
 POST /.well-known/miguelnetwork/v1 HTTP/1.1
@@ -17,7 +18,57 @@ Content-Type: application/json
 {"protocol":"miguel-discovery/1","nonce":"<base64url 32 random bytes>"}
 ```
 
-The server returns a JSON signature envelope:
+With the default `signResponses = false`, the response is the manifest itself:
+
+```json
+{
+  "protocol": "miguel-discovery/1",
+  "serverId": "unsigned",
+  "audience": "play.example.net:35548",
+  "clientNonce": "<the request nonce>",
+  "configEpoch": 1,
+  "issuedAt": 1788600000,
+  "expiresAt": 1788600120,
+  "routes": [
+    {
+      "id": "zstdnet-primary",
+      "transport": "WS",
+      "host": "play.example.net",
+      "port": 35548,
+      "pathPrefix": "miguelnetwork-v1",
+      "wstunnelTargetHost": "127.0.0.1",
+      "wstunnelTargetPort": 25566,
+      "priority": 200,
+      "filters": [
+        {"id": "zstdnet-stream", "version": 1, "required": true}
+      ]
+    },
+    {
+      "id": "minecraft-primary",
+      "transport": "WS",
+      "host": "play.example.net",
+      "port": 35548,
+      "pathPrefix": "miguelnetwork-v1",
+      "wstunnelTargetHost": "127.0.0.1",
+      "wstunnelTargetPort": 25567,
+      "priority": 100,
+      "filters": []
+    }
+  ],
+  "keyId": "unsigned"
+}
+```
+
+`wstunnelTargetHost` is new in alpha.6 and defaults to `127.0.0.1` when reading older v1 documents. It allows a server
+bound to an explicit `server-ip` to advertise that local target without any client configuration. The wstunnel server's
+generated restriction still limits requests to the detected host and ports.
+
+Routes are considered in descending priority. A client skips a route when it does not implement a required filter.
+Unknown optional filters may be ignored.
+
+## Optional signed envelope
+
+When the server enables `discovery.signResponses`, it wraps the exact manifest bytes:
 
 ```json
 {
@@ -27,84 +78,38 @@ The server returns a JSON signature envelope:
 }
 ```
 
-The decoded payload has this shape:
+A client with `security.verifyDiscoverySignatures = true` requires this envelope and validates the signature, `keyId`,
+protocol, audience, nonce, validity, pinned server identity and monotonic `configEpoch`. A client with verification off
+accepts either the raw manifest or an envelope without using the signature as a trust boundary.
 
-```json
-{
-  "protocol": "miguel-discovery/1",
-  "serverId": "persistent UUID",
-  "audience": "play.example.net:35548",
-  "clientNonce": "<the request nonce>",
-  "configEpoch": 1,
-  "issuedAt": 1788600000,
-  "expiresAt": 1788600120,
-  "routes": [
-    {
-      "id": "zstdnet-primary",
-      "transport": "WSS",
-      "host": "play.example.net",
-      "port": 35548,
-      "pathPrefix": "miguelnetwork-v1",
-      "wstunnelTargetPort": 25565,
-      "priority": 200,
-      "filters": [
-        {"id": "zstdnet-stream", "version": 1, "required": true}
-      ]
-    },
-    {
-      "id": "minecraft-primary",
-      "transport": "WSS",
-      "host": "play.example.net",
-      "port": 35548,
-      "pathPrefix": "miguelnetwork-v1",
-      "wstunnelTargetPort": 25566,
-      "priority": 100,
-      "filters": []
-    }
-  ],
-  "keyId": "<base64url SHA-256 of publicKey>"
-}
-```
+The private identity lives at `config/miguelnetwork/generated/discovery-identity.key`. It is generated only when signing
+is enabled. Losing it causes a key-change rejection on clients that previously pinned it.
 
-Routes are considered in descending priority. A client skips a route when it does not implement a required filter.
-Unknown optional filters may be ignored. The target port is intentionally part of the signed manifest: stock wstunnel
-requires the client to place it in the tunnel request, while the player never sees or configures it.
+WSS downgrade protection is separately controlled by `security.enforceWssDowngradeProtection`; it is disabled by
+default. When enabled, a successfully used WSS endpoint establishes a persistent floor in
+`config/miguelnetwork/client-trust.json`.
 
-## Validation and persistent state
+Nonce, audience and validity checks remain active for unsigned documents. They prevent accidental cache/cross-endpoint
+reuse, but without TLS and a verified signature they do not provide authentication against an active network attacker.
+This matches the default unencrypted Minecraft transport threat model.
 
-The client must validate all of the following before using a route:
+## Public-port multiplexing
 
-- the public HTTPS certificate and hostname;
-- the Ed25519 signature over the exact decoded payload bytes;
-- `keyId`, `protocol`, `audience`, request nonce and validity interval;
-- the previously pinned `serverId` and public key;
-- a `configEpoch` not lower than the highest value previously accepted.
+In `STANDALONE` mode the built-in gateway owns the public plain-HTTP/WS port. It handles the exact Discovery path and
+forwards all other connections, including `/miguelnetwork-v1/...`, unchanged to a private dynamic wstunnel listener.
 
-The first key is trusted only after a normal authenticated HTTPS exchange and is then pinned in
-`config/miguelnetwork/client-trust.json`. The private Ed25519 identity is generated once on the server at
-`config/miguelnetwork/generated/discovery-identity.key`; losing it looks like an identity attack to existing clients.
-Back up that file and do not publish it.
-
-Once a client has authenticated a WSS route, or successfully used legacy WSS, it records a WSS security floor. A later
-Discovery failure may retry WSS but may not silently downgrade that endpoint to WS or raw TCP. This protects returning
-clients; no protocol can provide equivalent downgrade protection for a brand-new endpoint without an authenticated
-bootstrap such as HTTPS.
-
-## Reverse proxy contract
-
-The Mod serves plain HTTP on a configurable internal address. TLS and path multiplexing normally happen at Nginx:
+In `EXTERNAL_PROXY` mode an external gateway performs the same split. A minimal Nginx mapping is:
 
 ```nginx
 location = /.well-known/miguelnetwork/v1 {
-    proxy_pass http://192.168.0.146:25567;
+    proxy_pass http://192.168.0.146:25568;
     proxy_http_version 1.1;
     proxy_set_header Host $http_host;
     proxy_set_header X-Forwarded-Host $http_host;
-    proxy_set_header X-Forwarded-Proto https;
 }
 
 location ^~ /miguelnetwork-v1/ {
-    proxy_pass http://192.168.0.146:35548;
+    proxy_pass http://192.168.0.146:35549;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
     proxy_set_header Connection "upgrade";
@@ -114,11 +119,10 @@ location ^~ /miguelnetwork-v1/ {
 }
 ```
 
-`$http_host` is important when the public endpoint uses a non-default port. If Nginx and Minecraft run on different
-machines or containers, set `discovery.bindHost` to a firewall-protected address reachable from Nginx.
+Preserve `$http_host` so a non-default public port remains in the audience. The external gateway may expose either WS
+or WSS; set `discovery.advertisedTransport` to match it.
 
 ## Compatibility fallback
 
-For servers that do not implement v1, `legacyFallback = true` retains alpha.2 probing (WSS, then WS, then TCP). Legacy
-mode still uses the conventional target port 25566 and cannot negotiate filters. It is a migration path, not part of
-the signed protocol.
+When v1 is absent, `legacyFallback = true` retains WSS → WS → TCP probing. Legacy mode cannot negotiate a target host,
+port or stream filter and therefore keeps the historical fixed target port. It is a migration path, not Discovery v1.

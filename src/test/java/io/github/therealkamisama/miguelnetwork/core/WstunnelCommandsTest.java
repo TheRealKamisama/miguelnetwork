@@ -12,7 +12,7 @@ class WstunnelCommandsTest {
     @Test
     void clientForcesTlsVerificationAndLoopbackTarget() {
         List<String> command = WstunnelCommands.client(
-                Path.of("wstunnel"), "mc.example.com", 25565, 49152, 25566, "miguelnetwork-v1",
+                Path.of("wstunnel"), "mc.example.com", 25565, 49152, "127.0.0.1", 25566, "miguelnetwork-v1",
                 TransportProtocol.WSS, true
         );
         assertTrue(command.contains("--tls-verify-certificate"));
@@ -23,16 +23,17 @@ class WstunnelCommandsTest {
     @Test
     void ipv6HostsAreBracketed() {
         List<String> command = WstunnelCommands.client(
-                Path.of("wstunnel"), "2001:db8::1", 443, 49152, 25566, "miguelnetwork-v1",
+                Path.of("wstunnel"), "2001:db8::1", 443, 49152, "2001:db8::2", 25566, "miguelnetwork-v1",
                 TransportProtocol.WSS, true
         );
         assertEquals("wss://[2001:db8::1]:443", command.get(command.size() - 1));
+        assertTrue(command.contains("tcp://127.0.0.1:49152:[2001:db8::2]:25566"));
     }
 
     @Test
     void clientCanDisableCertificateVerificationOnlyWhenExplicitlyRequested() {
         List<String> command = WstunnelCommands.client(
-                Path.of("wstunnel"), "127.0.0.1", 25565, 49152, 25566, "miguelnetwork-v1",
+                Path.of("wstunnel"), "127.0.0.1", 25565, 49152, "127.0.0.1", 25566, "miguelnetwork-v1",
                 TransportProtocol.WSS, false
         );
         assertTrue(!command.contains("--tls-verify-certificate"));
@@ -52,7 +53,7 @@ class WstunnelCommandsTest {
     @Test
     void clientAndServerCanUsePlainWebSocketWhenExplicitlyConfigured() {
         List<String> client = WstunnelCommands.client(
-                Path.of("wstunnel"), "192.0.2.10", 25565, 49152, 25566, "miguelnetwork-v1",
+                Path.of("wstunnel"), "192.0.2.10", 25565, 49152, "192.168.0.10", 25566, "miguelnetwork-v1",
                 TransportProtocol.WS, true
         );
         List<String> server = WstunnelCommands.server(

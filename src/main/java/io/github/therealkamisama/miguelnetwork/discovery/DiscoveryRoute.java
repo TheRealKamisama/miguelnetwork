@@ -11,6 +11,7 @@ public record DiscoveryRoute(
         String host,
         int port,
         String pathPrefix,
+        String wstunnelTargetHost,
         int wstunnelTargetPort,
         int priority,
         List<DiscoveryFilter> filters
@@ -20,9 +21,10 @@ public record DiscoveryRoute(
         Objects.requireNonNull(transport, "transport");
         Objects.requireNonNull(host, "host");
         Objects.requireNonNull(pathPrefix, "pathPrefix");
+        Objects.requireNonNull(wstunnelTargetHost, "wstunnelTargetHost");
         filters = List.copyOf(filters);
-        if (id.isBlank() || host.isBlank() || pathPrefix.isBlank()) {
-            throw new IllegalArgumentException("Route id, host and pathPrefix must not be blank");
+        if (id.isBlank() || host.isBlank() || pathPrefix.isBlank() || wstunnelTargetHost.isBlank()) {
+            throw new IllegalArgumentException("Route id, host, pathPrefix and target host must not be blank");
         }
         if (port < 1 || port > 65535 || wstunnelTargetPort < 1 || wstunnelTargetPort > 65535) {
             throw new IllegalArgumentException("Route ports must be in the range 1..65535");

@@ -42,6 +42,25 @@ public final class DiscoveryCodec {
         return GSON.toJson(envelope).getBytes(StandardCharsets.UTF_8);
     }
 
+    public static byte[] encodeUnsigned(DiscoveryManifest manifest) {
+        return encodePayload(manifest);
+    }
+
+    public static DiscoveryManifest decodeWithoutSignatureVerification(byte[] document)
+            throws GeneralSecurityException {
+        if (document.length == 0 || document.length > MAX_DOCUMENT_BYTES) {
+            throw new GeneralSecurityException("Discovery document is empty or oversized");
+        }
+        try {
+            JsonObject root = GSON.fromJson(new String(document, StandardCharsets.UTF_8), JsonObject.class);
+            return root != null && root.has("payload")
+                    ? decodePayload(decodeRequired(root, "payload"))
+                    : decodePayload(document);
+        } catch (RuntimeException exception) {
+            throw new GeneralSecurityException("Malformed Discovery document", exception);
+        }
+    }
+
     public static SignedDiscoveryDocument decodeAndVerify(byte[] document)
             throws GeneralSecurityException {
         if (document.length == 0 || document.length > MAX_DOCUMENT_BYTES) {
@@ -108,6 +127,8 @@ public final class DiscoveryCodec {
                     requiredString(route, "host"),
                     route.get("port").getAsInt(),
                     requiredString(route, "pathPrefix"),
+                    route.has("wstunnelTargetHost")
+                            ? requiredString(route, "wstunnelTargetHost") : "127.0.0.1",
                     route.get("wstunnelTargetPort").getAsInt(),
                     route.get("priority").getAsInt(),
                     filters

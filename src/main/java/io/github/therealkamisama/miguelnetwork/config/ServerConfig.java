@@ -1,19 +1,18 @@
 package io.github.therealkamisama.miguelnetwork.config;
 
+import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class ServerConfig {
     public static final ModConfigSpec SPEC;
     private static final ModConfigSpec.BooleanValue ENABLED;
-    private static final ModConfigSpec.EnumValue<TransportProtocol> TRANSPORT;
+    private static final ModConfigSpec.EnumValue<DeploymentMode> MODE;
     private static final ModConfigSpec.ConfigValue<String> BIND_HOST;
     private static final ModConfigSpec.IntValue PUBLIC_PORT;
     private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ModConfigSpec.ConfigValue<String> CERTIFICATE;
-    private static final ModConfigSpec.ConfigValue<String> PRIVATE_KEY;
-    private static final ModConfigSpec.BooleanValue ALLOW_BUILT_IN_SELF_SIGNED;
     private static final ModConfigSpec.BooleanValue DISCOVERY_ENABLED;
+    private static final ModConfigSpec.BooleanValue SIGN_DISCOVERY;
     private static final ModConfigSpec.ConfigValue<String> DISCOVERY_BIND_HOST;
     private static final ModConfigSpec.IntValue DISCOVERY_PORT;
     private static final ModConfigSpec.EnumValue<TransportProtocol> ADVERTISED_TRANSPORT;
@@ -24,42 +23,52 @@ public final class ServerConfig {
 
     static {
         ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        builder.comment("MiguelNetwork dedicated-server WebSocket transport settings.");
-        ENABLED = builder.comment("Start the bundled wstunnel server when the dedicated server is ready.")
-                .define("enabled", false);
-        TRANSPORT = builder.comment(
-                        "WebSocket transport. WSS is the secure default; use WS only behind a TLS reverse proxy",
-                        "or for an explicitly isolated development test.")
-                .defineEnum("transport", TransportProtocol.WSS);
-        BIND_HOST = builder.comment("Address exposed by wstunnel. Use 0.0.0.0 for all IPv4 interfaces.")
-                .define("bindHost", "0.0.0.0", ServerConfig::isNonBlankString);
-        PUBLIC_PORT = builder.comment("WebSocket listener port.")
-                .defineInRange("publicPort", 25565, 1, 65535);
-        PATH_PREFIX = builder.comment("HTTP Upgrade path prefix shared with clients.")
-                .define("pathPrefix", "miguelnetwork-v1", ServerConfig::isNonBlankString);
-        CERTIFICATE = builder.comment("Absolute path to a PEM certificate chain.")
-                .define("certificate", "");
-        PRIVATE_KEY = builder.comment("Absolute path to the corresponding PEM private key.")
-                .define("privateKey", "");
-        ALLOW_BUILT_IN_SELF_SIGNED = builder.comment(
-                        "Allow wstunnel's built-in self-signed certificate. Development only; never expose publicly.")
-                .define("allowBuiltInSelfSigned", false);
-        builder.push("discovery");
-        DISCOVERY_ENABLED = builder.comment("Serve signed MiguelNetwork Discovery manifests on a loopback HTTP port.")
+        builder.comment(
+                "MiguelNetwork dedicated-server settings.",
+                "Minecraft target IP/port come from server.properties; the supported ZstdNet listener is auto-detected."
+        );
+        ENABLED = builder.comment("Start MiguelNetwork automatically when the dedicated server is ready.")
                 .define("enabled", true);
-        DISCOVERY_BIND_HOST = builder.comment("Bind address for the HTTP endpoint consumed by a reverse proxy.")
-                .define("bindHost", "127.0.0.1", ServerConfig::isNonBlankString);
-        DISCOVERY_PORT = builder.comment("Loopback HTTP port for /.well-known/miguelnetwork/v1.")
-                .defineInRange("port", 25567, 1, 65535);
-        ADVERTISED_TRANSPORT = builder.comment("Public transport after TLS termination (normally WSS).")
-                .defineEnum("advertisedTransport", TransportProtocol.WSS);
-        ADVERTISED_HOST = builder.comment("Public host. Empty derives it from the reverse-proxy Host header.")
+        MODE = builder.comment(
+                        "STANDALONE: the Mod multiplexes Discovery and wstunnel on publicPort using plain WS.",
+                        "EXTERNAL_PROXY: Nginx or another gateway owns the public endpoint and may provide WSS."
+                ).defineEnum("mode", DeploymentMode.STANDALONE);
+        BIND_HOST = builder.comment(
+                        "STANDALONE: public gateway bind address.",
+                        "EXTERNAL_PROXY: private wstunnel bind address reachable by the external gateway."
+                ).define("bindHost", "0.0.0.0", ServerConfig::isNonBlankString);
+        PUBLIC_PORT = builder.comment(
+                        "STANDALONE: the single public WS/Discovery port.",
+                        "EXTERNAL_PROXY: the private wstunnel upstream port. It must differ from server-port."
+                ).defineInRange("publicPort", 35548, 1, 65535);
+        PATH_PREFIX = builder.comment("HTTP Upgrade path prefix shared with clients.")
+                .define("pathPrefix", MiguelNetworkProtocol.DEFAULT_PATH_PREFIX, ServerConfig::isNonBlankString);
+
+        builder.push("discovery");
+        DISCOVERY_ENABLED = builder.comment("Publish MiguelNetwork Discovery manifests.")
+                .define("enabled", true);
+        SIGN_DISCOVERY = builder.comment(
+                        "Sign Discovery manifests with a persistent Ed25519 identity.",
+                        "Optional and disabled by default because the underlying Minecraft stream is normally unencrypted."
+                ).define("signResponses", false);
+        DISCOVERY_BIND_HOST = builder.comment(
+                        "EXTERNAL_PROXY only: private Discovery HTTP bind address. Ignored in STANDALONE mode."
+                ).define("bindHost", "127.0.0.1", ServerConfig::isNonBlankString);
+        DISCOVERY_PORT = builder.comment(
+                        "EXTERNAL_PROXY only: private Discovery HTTP port. Ignored in STANDALONE mode."
+                ).defineInRange("port", 25568, 1, 65535);
+        ADVERTISED_TRANSPORT = builder.comment(
+                        "EXTERNAL_PROXY public transport. Use WSS when the gateway terminates TLS.",
+                        "STANDALONE always advertises WS."
+                ).defineEnum("advertisedTransport", TransportProtocol.WS);
+        ADVERTISED_HOST = builder.comment("Public host. Empty derives it from the request Host header.")
                 .define("advertisedHost", "");
-        ADVERTISED_PORT = builder.comment("Public port. Zero derives it from the reverse-proxy Host header.")
+        ADVERTISED_PORT = builder.comment("Public port. Zero derives it from the request Host header.")
                 .defineInRange("advertisedPort", 0, 0, 65535);
-        DISCOVERY_CONFIG_EPOCH = builder.comment("Monotonic number. Increase when intentionally replacing routes.")
-                .defineInRange("configEpoch", 1L, 0L, Long.MAX_VALUE);
-        DISCOVERY_VALIDITY_SECONDS = builder.comment("Lifetime of each signed manifest.")
+        DISCOVERY_CONFIG_EPOCH = builder.comment(
+                        "Monotonic route revision used only when clients enable signature verification."
+                ).defineInRange("configEpoch", 1L, 0L, Long.MAX_VALUE);
+        DISCOVERY_VALIDITY_SECONDS = builder.comment("Lifetime of each Discovery manifest.")
                 .defineInRange("validitySeconds", 120, 15, 3600);
         builder.pop();
         SPEC = builder.build();
@@ -72,44 +81,33 @@ public final class ServerConfig {
         return booleanProperty("miguelnetwork.server.enabled", ENABLED.get());
     }
 
-    public static TransportProtocol transport() {
-        return TransportProtocol.property("miguelnetwork.server.transport", TRANSPORT.get());
+    public static DeploymentMode mode() {
+        String override = System.getProperty("miguelnetwork.server.mode");
+        return override == null ? MODE.get() : DeploymentMode.valueOf(override.trim().toUpperCase());
     }
 
     public static String bindHost() {
-        return System.getProperty("miguelnetwork.bindHost", BIND_HOST.get());
+        return System.getProperty("miguelnetwork.bindHost", BIND_HOST.get()).trim();
     }
 
     public static int publicPort() {
         return Integer.getInteger("miguelnetwork.public.port", PUBLIC_PORT.get());
     }
 
-    public static int targetPort(int actualServerPort) {
-        return Integer.getInteger("miguelnetwork.target.port", actualServerPort);
-    }
-
     public static String pathPrefix() {
-        return System.getProperty("miguelnetwork.pathPrefix", PATH_PREFIX.get());
-    }
-
-    public static String certificate() {
-        return System.getProperty("miguelnetwork.tls.certificate", CERTIFICATE.get()).trim();
-    }
-
-    public static String privateKey() {
-        return System.getProperty("miguelnetwork.tls.privateKey", PRIVATE_KEY.get()).trim();
-    }
-
-    public static boolean allowBuiltInSelfSigned() {
-        return booleanProperty("miguelnetwork.tls.allowBuiltInSelfSigned", ALLOW_BUILT_IN_SELF_SIGNED.get());
+        return System.getProperty("miguelnetwork.pathPrefix", PATH_PREFIX.get()).trim();
     }
 
     public static boolean discoveryEnabled() {
         return booleanProperty("miguelnetwork.discovery.enabled", DISCOVERY_ENABLED.get());
     }
 
+    public static boolean signDiscoveryResponses() {
+        return booleanProperty("miguelnetwork.discovery.signResponses", SIGN_DISCOVERY.get());
+    }
+
     public static String discoveryBindHost() {
-        return System.getProperty("miguelnetwork.discovery.bindHost", DISCOVERY_BIND_HOST.get());
+        return System.getProperty("miguelnetwork.discovery.bindHost", DISCOVERY_BIND_HOST.get()).trim();
     }
 
     public static int discoveryPort() {
@@ -117,7 +115,11 @@ public final class ServerConfig {
     }
 
     public static TransportProtocol advertisedTransport() {
-        return TransportProtocol.property("miguelnetwork.discovery.advertisedTransport", ADVERTISED_TRANSPORT.get());
+        if (mode() == DeploymentMode.STANDALONE) {
+            return TransportProtocol.WS;
+        }
+        return TransportProtocol.property(
+                "miguelnetwork.discovery.advertisedTransport", ADVERTISED_TRANSPORT.get());
     }
 
     public static String advertisedHost() {

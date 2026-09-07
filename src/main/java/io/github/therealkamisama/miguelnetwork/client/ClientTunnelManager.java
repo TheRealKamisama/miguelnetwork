@@ -126,9 +126,9 @@ public final class ClientTunnelManager {
             boolean permitZstdNet,
             String endpoint
     ) {
-        return select(manifest, permitZstdNet, trustStore.requiresWss(endpoint))
+        return select(manifest, permitZstdNet, requiresWss(endpoint))
                 .orElseThrow(() -> new IllegalStateException(
-                        "Signed Discovery returned no compatible route for " + endpoint));
+                        "Discovery returned no compatible route for " + endpoint));
     }
 
     private static Optional<RoutePlan> select(DiscoveryManifest manifest, boolean permitZstdNet, boolean requireWss) {
@@ -160,14 +160,14 @@ public final class ClientTunnelManager {
             Exception discoveryFailure
     ) {
         if (!ClientConfig.legacyFallback()) {
-            if (trustStore.requiresWss(endpoint)) {
+            if (requiresWss(endpoint)) {
                 throw downgradeBlocked(endpoint, discoveryFailure);
             }
             return Optional.empty();
         }
         CachedLegacyRoute cached = LEGACY_ROUTES.get(endpoint);
         if (cached != null && !cached.expired()) {
-            if (trustStore.requiresWss(endpoint)
+            if (requiresWss(endpoint)
                     && (cached.route().isEmpty() || !cached.route().get().usesTls())) {
                 LEGACY_ROUTES.remove(endpoint);
             } else {
@@ -180,7 +180,7 @@ public final class ClientTunnelManager {
 
         Optional<TransportProtocol> forced = ClientConfig.forcedTransport();
         Optional<TransportProtocol> detected;
-        if (trustStore.requiresWss(endpoint)) {
+        if (requiresWss(endpoint)) {
             detected = ClientTransportProbe.detectOnly(
                     original.getHostString(), original.getPort(), ClientConfig.targetPort(),
                     ClientConfig.pathPrefix(), DISCOVERY_TIMEOUT, TransportProtocol.WSS
@@ -196,7 +196,7 @@ public final class ClientTunnelManager {
         }
         rememberLegacy(endpoint, detected);
         if (detected.isPresent()) {
-            if (detected.get().usesTls()) {
+            if (detected.get().usesTls() && ClientConfig.enforceWssDowngradeProtection()) {
                 trustStore.recordWss(endpoint);
             }
             MiguelNetwork.LOGGER.info("MiguelNetwork selected legacy {} route for {}", detected.get(), endpoint);
@@ -235,7 +235,7 @@ public final class ClientTunnelManager {
             Path executable = NativeWstunnel.resolve(FMLPaths.GAMEDIR.get());
             started = ManagedWstunnelProcess.start(
                     WstunnelCommands.client(
-                            executable, route.host(), route.port(), localPort, route.targetPort(),
+                            executable, route.host(), route.port(), localPort, route.targetHost(), route.targetPort(),
                             route.pathPrefix(), route.transport(), verifyCertificate
                     ),
                     line -> line.contains("Starting TCP server listening cnx on"),
@@ -259,8 +259,13 @@ public final class ClientTunnelManager {
         if (trustStore == null) {
             Path path = FMLPaths.GAMEDIR.get().resolve("config/miguelnetwork/client-trust.json");
             trustStore = ClientTrustStore.open(path);
-            discoveryService = new ClientDiscoveryService(trustStore, DISCOVERY_TIMEOUT);
+            discoveryService = new ClientDiscoveryService(
+                    trustStore, DISCOVERY_TIMEOUT, ClientConfig.verifyDiscoverySignatures());
         }
+    }
+
+    private static boolean requiresWss(String endpoint) {
+        return ClientConfig.enforceWssDowngradeProtection() && trustStore.requiresWss(endpoint);
     }
 
     private static void evictToCapacity(int maximum) {
@@ -345,13 +350,13 @@ public final class ClientTunnelManager {
             return new RoutePlan(route, false,
                     "discovery:" + route.id() + ":" + route.transport().scheme() + ":"
                             + route.host() + ":" + route.port() + ":" + route.pathPrefix() + ":"
-                            + route.wstunnelTargetPort());
+                            + route.wstunnelTargetHost() + ":" + route.wstunnelTargetPort());
         }
 
         private static RoutePlan legacy(TransportProtocol transport, InetSocketAddress original) {
             DiscoveryRoute route = new DiscoveryRoute(
                     "legacy-" + transport.scheme(), transport, original.getHostString(), original.getPort(),
-                    ClientConfig.pathPrefix(), ClientConfig.targetPort(), 0, java.util.List.of()
+                    ClientConfig.pathPrefix(), "127.0.0.1", ClientConfig.targetPort(), 0, java.util.List.of()
             );
             return new RoutePlan(route, false, "legacy:" + transport.scheme());
         }
@@ -374,6 +379,10 @@ public final class ClientTunnelManager {
 
         private int targetPort() {
             return discoveryRoute.wstunnelTargetPort();
+        }
+
+        private String targetHost() {
+            return discoveryRoute.wstunnelTargetHost();
         }
 
         private String pathPrefix() {

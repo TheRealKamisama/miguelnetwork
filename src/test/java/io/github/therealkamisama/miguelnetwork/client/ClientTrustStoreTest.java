@@ -62,7 +62,7 @@ class ClientTrustStoreTest {
                 now + 120,
                 List.of(new DiscoveryRoute(
                         "primary", TransportProtocol.WSS, "example.test", 35548,
-                        "miguelnetwork-v1", 25566, 100, List.of()
+                        "miguelnetwork-v1", "127.0.0.1", 25566, 100, List.of()
                 )),
                 DiscoveryCodec.keyId(pair.getPublic())
         );

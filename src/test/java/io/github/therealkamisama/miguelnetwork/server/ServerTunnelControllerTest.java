@@ -18,4 +18,23 @@ class ServerTunnelControllerTest {
         assertFalse(yaml.contains("ReverseTunnel"));
         assertFalse(yaml.contains("Udp"));
     }
+
+    @Test
+    void generatedRestrictionsAllowAnExplicitServerPropertiesAddress() {
+        String yaml = ServerTunnelController.restrictions(
+                "miguelnetwork-v1", "192.168.0.146", List.of(25567, 25566));
+
+        assertTrue(yaml.contains("192.168.0.146/32"));
+        assertTrue(yaml.contains("\"25567\""));
+        assertTrue(yaml.contains("\"25566\""));
+    }
+
+    @Test
+    void generatedRestrictionsEscapeHostnameAndPathRegexCharacters() {
+        String yaml = ServerTunnelController.restrictions(
+                "miguel.network-v1", "backend.example.test", List.of(25567));
+
+        assertTrue(yaml.contains("miguel\\\\.network-v1"));
+        assertTrue(yaml.contains("backend\\\\.example\\\\.test"));
+    }
 }

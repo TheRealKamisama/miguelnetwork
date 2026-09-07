@@ -1,98 +1,157 @@
-# Configuration
+# Configuration and deployment
 
-MiguelNetwork uses NeoForge TOML configuration. The dedicated-server listener is disabled by default. A client needs no
-per-server entry: each server can publish a signed Discovery route.
+MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` through NeoForge.
+The server configuration is a COMMON config so it is created in the documented top-level `config` directory, not under
+a world's `serverconfig` directory.
 
-## Dedicated server
+The Mod reads the running Minecraft port and `server-ip` from `server.properties`. A blank/wildcard `server-ip` becomes
+the loopback target `127.0.0.1`; an explicit address is preserved. ZstdNet 1.4.7 is detected reflectively and its listen
+port becomes a higher-priority route. The resolved values are written on every start to
+`config/miguelnetwork/generated/detected-server.toml`; this generated file is diagnostic and must not be edited.
 
-Keep the Minecraft listener away from the public WebSocket listener and bind it to loopback or a trusted network:
+`publicPort` cannot equal `server-port` or the detected ZstdNet port: the public gateway/wstunnel listener and the
+Minecraft backend are different listeners and cannot bind the same address and port.
+
+## Mode 1: standalone (default)
+
+Use this when the Minecraft machine can expose one additional TCP port and no Nginx is wanted. MiguelNetwork starts a
+private wstunnel listener on a dynamic loopback port, then starts its built-in gateway on `publicPort`. The gateway
+answers Discovery itself and forwards every other HTTP/WebSocket connection byte-for-byte to wstunnel.
+
+Example `server.properties`:
 
 ```properties
 server-ip=127.0.0.1
-server-port=25566
+server-port=25567
 ```
 
-After the first launch, edit `config/miguelnetwork-server.toml`:
+Generated/default `config/miguelnetwork-server.toml`:
 
 ```toml
 enabled = true
-transport = "WS"
+mode = "STANDALONE"
 bindHost = "0.0.0.0"
 publicPort = 35548
 pathPrefix = "miguelnetwork-v1"
-certificate = ""
-privateKey = ""
-allowBuiltInSelfSigned = false
 
 [discovery]
 enabled = true
-bindHost = "127.0.0.1"
-port = 25567
-advertisedTransport = "WSS"
+signResponses = false
+bindHost = "127.0.0.1" # ignored in standalone mode
+port = 25568            # ignored in standalone mode
+advertisedTransport = "WS" # standalone is always WS
 advertisedHost = ""
 advertisedPort = 0
 configEpoch = 1
 validitySeconds = 120
 ```
 
-This example assumes Nginx terminates TLS and forwards private WS to port 35548. For direct TLS in wstunnel, select
-`transport = "WSS"` and configure absolute `certificate` and `privateKey` PEM paths. On Windows, forward slashes in paths
-avoid TOML escaping surprises.
+Deployment steps:
 
-The generated wstunnel restriction follows the actual `server-port`. Discovery signs that target port, so it no longer
-has to be 25566. When supported ZstdNet is installed, its listener port is also restricted and advertised as a separate
-higher-priority route.
+1. Install NeoForge, MiguelNetwork and optionally the supported ZstdNet on both client and server.
+2. Keep the Minecraft/ZstdNet backend port private; expose TCP `35548` (or the configured `publicPort`) on the firewall
+   and NAT it directly to the Minecraft machine.
+3. Start the server. Confirm the log says `standalone WS gateway is ready` and inspect `detected-server.toml`.
+4. Add `host:35548` to the client server list. No client target port, WS/WSS choice or server allowlist is required.
 
-The Discovery listener is plain internal HTTP and must not be exposed directly. If Nginx runs in another container or
-machine, change `discovery.bindHost` to the Minecraft machine's protected LAN address and firewall the port so only the
-proxy can reach it. Empty advertised host and zero advertised port derive the public endpoint from the forwarded Host
-header. Increase `configEpoch` when intentionally replacing routes; clients reject lower values as a rollback.
+Standalone deliberately uses plain WS. It does not generate or manage certificates.
 
-The generated server identity at `config/miguelnetwork/generated/discovery-identity.key` is security-sensitive. Back it
-up with the server and never publish it.
+## Mode 2: external Nginx proxy
 
-## Client
+Use this when an existing gateway should provide TLS/WSS. MiguelNetwork exposes two private upstreams: wstunnel on
+`bindHost:publicPort` and Discovery on `discovery.bindHost:discovery.port`. Nginx combines them on its public port.
 
-The generated `config/miguelnetwork-client.toml` works without editing:
+Example server config:
+
+```toml
+enabled = true
+mode = "EXTERNAL_PROXY"
+bindHost = "192.168.0.146"
+publicPort = 35549
+pathPrefix = "miguelnetwork-v1"
+
+[discovery]
+enabled = true
+signResponses = false
+bindHost = "192.168.0.146"
+port = 25568
+advertisedTransport = "WSS"
+advertisedHost = "kraber.top"
+advertisedPort = 35548
+configEpoch = 1
+validitySeconds = 120
+```
+
+Matching Nginx server locations:
+
+```nginx
+location = /.well-known/miguelnetwork/v1 {
+    proxy_pass http://192.168.0.146:25568;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Proto https;
+}
+
+location ^~ /miguelnetwork-v1/ {
+    proxy_pass http://192.168.0.146:35549;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $http_host;
+    proxy_read_timeout 86400s;
+    proxy_send_timeout 86400s;
+}
+```
+
+Deployment steps:
+
+1. Install the Mod and set `mode = "EXTERNAL_PROXY"`; bind both upstreams only to loopback or a protected LAN.
+2. Configure Nginx TLS and the two locations above. The private Nginx-to-wstunnel hop remains WS.
+3. Set `advertisedTransport = "WSS"`, and set the public host/port explicitly or leave them empty/zero to derive them
+   from the preserved Host header.
+4. Expose only Nginx's public port. Restart the Minecraft server after changing transport settings.
+
+## Optional security controls
+
+WSS and Discovery signatures are independent optional controls and are disabled by default at the protocol policy
+level. Normal WSS certificate verification remains enabled whenever a WSS route is actually selected.
+
+Server:
+
+```toml
+[discovery]
+signResponses = true
+```
+
+Client:
+
+```toml
+[security]
+verifyDiscoverySignatures = true
+enforceWssDowngradeProtection = true
+verifyTlsCertificates = true
+```
+
+When signing is enabled, the server creates `config/miguelnetwork/generated/discovery-identity.key`. Clients that enable
+verification pin this identity and reject configuration rollback. Enable `signResponses` and
+`verifyDiscoverySignatures` together. Existing trust data remains in `config/miguelnetwork/client-trust.json`, but it
+does not force WSS while `enforceWssDowngradeProtection = false`.
+
+## Client defaults
 
 ```toml
 enabled = true
 pathPrefix = "miguelnetwork-v1"
 maxTunnelProcesses = 8
 legacyFallback = true
+
+[security]
+verifyDiscoverySignatures = false
+enforceWssDowngradeProtection = false
+verifyTlsCertificates = true
 ```
 
-For each new logical Minecraft address, the client first requests
-`https://<logical-server>/.well-known/miguelnetwork/v1`. It validates TLS, the Ed25519 signature, nonce, audience,
-validity, pinned identity and configuration epoch, then starts the server-selected route. The player's server entry is
-unchanged. Pins and the persistent WSS downgrade floor are stored in `config/miguelnetwork/client-trust.json`.
-
-If Discovery is unavailable and `legacyFallback` is enabled, the alpha.2 probe remains available:
-
-1. WSS with normal certificate and hostname verification;
-2. plain WS;
-3. unchanged vanilla Minecraft TCP when neither Upgrade probe succeeds.
-
-Only this legacy path uses the fixed target-port convention 25566. A negative legacy TCP result is cached for 30
-seconds; successful routes are cached for the game session. Least-recently-used sidecars are stopped at
-`maxTunnelProcesses`.
-
-Legacy WS fallback cannot be downgrade-proof on first contact. After WSS has succeeded, MiguelNetwork records a WSS
-security floor and will no longer silently fall back to WS or TCP for that endpoint.
-
-## Reverse proxy
-
-Server-side `transport = "WS"` is suitable behind TLS-terminating Nginx. In that layout, `transport` describes the
-private Nginx-to-wstunnel hop and `advertisedTransport = "WSS"` describes the public client hop. Preserve `$http_host`
-so non-default public ports remain part of the signed audience.
-
-See `DISCOVERY_PROTOCOL.md` for matching Nginx locations and the full protocol/security contract. Never expose a
-production WS or internal Discovery listener directly to the internet.
-
-## Isolated development only
-
-Direct wstunnel WSS can use its built-in self-signed certificate only with `allowBuiltInSelfSigned = true`. Automated
-local tests may pair this with `-Dmiguelnetwork.tls.verify=false`. Both settings are development-only and log warnings.
-
-JVM property overrides used by automated validation remain documented in `TECHNICAL_VALIDATION.md`. Restart Minecraft
-or the dedicated server after changing transport settings; live sidecar reconfiguration is not part of this Alpha.
+The client tries Discovery on the logical endpoint over HTTPS and then HTTP. The returned route supplies its public
+WS/WSS endpoint and the automatically detected backend host/port. If Discovery is absent, the legacy WSS → WS → TCP
+probe remains available; only that compatibility path retains the old fixed target-port convention.

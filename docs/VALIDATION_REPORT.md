@@ -1,5 +1,8 @@
 # Phase 0 validation report
 
+> Historical note: this report records alpha.1-alpha.5 validation configurations. Alpha.6 defaults to standalone WS
+> and makes Discovery signing/WSS downgrade enforcement optional. See `CONFIGURATION.md` for current deployment.
+
 Date: 2026-09-05
 
 ## Verified
