@@ -5,9 +5,10 @@ import net.neoforged.fml.ModList;
 
 import java.lang.reflect.Method;
 import java.util.OptionalInt;
+import java.util.Set;
 
 public final class ZstdNetServerCompatibility {
-    public static final String SUPPORTED_VERSION = "1.4.7";
+    private static final Set<String> SUPPORTED_VERSIONS = Set.of("1.4.7", "1.4.8");
 
     private ZstdNetServerCompatibility() {
     }
@@ -20,8 +21,8 @@ public final class ZstdNetServerCompatibility {
         String version = container.get().getModInfo().getVersion().toString();
         if (!isSupportedVersion(version)) {
             MiguelNetwork.LOGGER.warn(
-                    "ZstdNet {} is installed, but MiguelNetwork only enables its reflective adapter for {}",
-                    version, SUPPORTED_VERSION
+                    "ZstdNet {} is installed, but MiguelNetwork only enables its reflective adapter for [{}]",
+                    version, supportedVersionsLabel()
             );
             return OptionalInt.empty();
         }
@@ -41,6 +42,10 @@ public final class ZstdNetServerCompatibility {
     }
 
     public static boolean isSupportedVersion(String version) {
-        return SUPPORTED_VERSION.equals(version);
+        return SUPPORTED_VERSIONS.contains(version);
+    }
+
+    private static String supportedVersionsLabel() {
+        return String.join(", ", SUPPORTED_VERSIONS.stream().sorted().toList());
     }
 }

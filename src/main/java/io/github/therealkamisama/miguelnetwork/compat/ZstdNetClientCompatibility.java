@@ -34,8 +34,9 @@ public final class ZstdNetClientCompatibility {
                     .map(container -> container.getModInfo().getVersion().toString()).orElse("unknown");
             MiguelNetwork.LOGGER.warn("MiguelNetwork ZstdNet client adapter disabled for unsupported version {}", version);
         } else if (result) {
-            MiguelNetwork.LOGGER.info("MiguelNetwork enabled its ZstdNet {} compatibility adapter",
-                    ZstdNetServerCompatibility.SUPPORTED_VERSION);
+            String version = ModList.get().getModContainerById("zstdnet")
+                    .map(container -> container.getModInfo().getVersion().toString()).orElse("unknown");
+            MiguelNetwork.LOGGER.info("MiguelNetwork enabled its ZstdNet {} compatibility adapter", version);
         }
         supported = result;
         return result;

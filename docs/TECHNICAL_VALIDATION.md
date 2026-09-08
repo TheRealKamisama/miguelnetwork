@@ -1,5 +1,9 @@
 # Technical validation
 
+This guide describes the 0.2.0 validation workflow. Contributor setup and test
+coverage are summarized in [`DEVELOPMENT.md`](DEVELOPMENT.md); installation and
+log interpretation are in [`USER_GUIDE.md`](USER_GUIDE.md).
+
 The primary manual acceptance path is documented in `CONFIGURATION.md`. For automated/local runs, the most useful JVM
 overrides are:
 
@@ -38,6 +42,13 @@ Optional client security checks can be exercised with:
 The first option requires `-Dmiguelnetwork.discovery.signResponses=true` on the server. Certificate verification should
 only be disabled for an isolated test using `-Dmiguelnetwork.tls.verify=false`.
 
-Run the full unit/integration suite with `gradle clean test jar`. Tests cover command construction, signed and unsigned
-Discovery codecs, target address resolution, restriction generation, process lifecycle utilities, and the built-in
+Run the full unit/integration suite with the checked-in wrapper:
+
+```text
+.\gradlew.bat clean test jar
+```
+
+On Linux/macOS use `./gradlew clean test jar`. Tests cover command construction,
+signed and unsigned Discovery codecs, target address resolution, restriction
+generation, process lifecycle utilities, ZstdNet version gating, and the built-in
 gateway's Discovery/Upgrade split over real loopback sockets.

@@ -1,7 +1,8 @@
 # ZstdNet compatibility
 
-MiguelNetwork `0.1.0-alpha.6` contains a unilateral compatibility adapter for ZstdNet `1.4.7` on Minecraft 1.21.1
-NeoForge. ZstdNet itself and its JAR are not modified, and no Zstd compression code is copied.
+MiguelNetwork `0.2.0` contains the unilateral compatibility adapter introduced in
+alpha.6 for ZstdNet `1.4.7` and `1.4.8` on Minecraft 1.21.1 NeoForge. ZstdNet
+itself and its JAR are not modified, and no Zstd compression code is copied.
 
 ## Byte-stream composition
 
@@ -25,7 +26,7 @@ adds that port to the generated wstunnel restriction, and advertises a higher-pr
 `zstdnet-stream` filter. A second raw route targets the Minecraft backend, so clients without ZstdNet still have a
 usable MiguelNetwork route.
 
-On the client, ZstdNet 1.4.7's coremod normally creates its loopback proxy before Minecraft reaches
+On the client, the supported ZstdNet coremod normally creates its loopback proxy before Minecraft reaches
 `Connection.connect`. MiguelNetwork uses an optional pseudo-mixin on ZstdNet's hook class, creates the wstunnel route
 first, invokes ZstdNet's public `LocalZstdNet.start(...)` API reflectively, and publishes the returned handle back to
 ZstdNet so its normal UI/login/logout lifecycle remains responsible for closing it. Injecting into the hook class
@@ -36,14 +37,14 @@ from `ServerData`, replaces that premature direct proxy, and consumes the bypass
 
 ## Version and failure policy
 
-The reflective adapter is enabled only when the installed Mod metadata version is exactly `1.4.7` and the expected
-classes, methods and fields are present. This narrow gate is deliberate because ZstdNet exposes no stable integration
-SPI for replacing the upstream address and adopting an externally created `ProxyHandle`.
+The reflective adapter is enabled only when the installed Mod metadata version is exactly `1.4.7` or `1.4.8` and the
+expected classes, methods and fields are present. This narrow gate is deliberate because ZstdNet exposes no stable
+integration SPI for replacing the upstream address and adopting an externally created `ProxyHandle`.
 
 If a Discovery manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. A compatible
 raw route may still be selected. A manifest with no compatible route fails closed rather than connecting to an
 unadvertised backend. Unknown ZstdNet versions use their original hook and log a compatibility warning; they are not
 claimed as supported until their exact API has been tested.
 
-The only private reflection in the 1.4.7 adapter is the narrow handoff to `ConnectScreenHooks.currentProxy` and its
+The only private reflection in the adapter is the narrow handoff to `ConnectScreenHooks.currentProxy` and its
 lock. Compression, framing, status probing, statistics and proxy shutdown continue to be owned by ZstdNet.

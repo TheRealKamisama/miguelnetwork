@@ -1,6 +1,6 @@
 # MiguelNetwork Discovery Protocol v1
 
-Status: experimental, implemented by MiguelNetwork `0.1.0-alpha.6`.
+Status: experimental, implemented by MiguelNetwork `0.2.0` (introduced in alpha.6).
 
 Discovery turns the logical Minecraft address entered by a player into a transport route. It is a control plane only:
 Minecraft and wstunnel stream bytes do not pass through the Discovery document generator. The same public port may be
@@ -59,7 +59,7 @@ With the default `signResponses = false`, the response is the manifest itself:
 }
 ```
 
-`wstunnelTargetHost` is new in alpha.6 and defaults to `127.0.0.1` when reading older v1 documents. It allows a server
+`wstunnelTargetHost` was introduced in alpha.6 and defaults to `127.0.0.1` when reading older v1 documents. It allows a server
 bound to an explicit `server-ip` to advertise that local target without any client configuration. The wstunnel server's
 generated restriction still limits requests to the detected host and ports.
 

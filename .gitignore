@@ -4,3 +4,7 @@ run/
 out/
 *.log
 
+# Local coding-agent state; repository instructions belong in AGENTS.md.
+.agents/
+.codex/
+

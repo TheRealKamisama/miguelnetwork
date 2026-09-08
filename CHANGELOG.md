@@ -1,7 +1,17 @@
 # Changelog
 
+## 0.2.0 - 2026-09-08
+
+- Promote the standalone gateway, Discovery v1 routing, automatic endpoint detection, and optional ZstdNet 1.4.7/1.4.8
+  compatibility adapter into the 0.2.0 release line.
+- Add repository-local Agent contribution instructions and dedicated user, development, and release-preparation guides.
+- Document runtime log evidence for standalone mode, built-in gateway multiplexing, Discovery route selection, and
+  detection of legacy fallback.
+- Prepare the checked-in Gradle wrapper build and GitHub CLI workflow without logging in or publishing a release.
+
 ## 0.1.0-alpha.6
 
+- Verify and enable the existing ZstdNet compatibility adapter for ZstdNet 1.4.8 while retaining 1.4.7 support.
 - Add `STANDALONE` and `EXTERNAL_PROXY` deployment modes.
 - Add a built-in plain-WS gateway that multiplexes Discovery and wstunnel on one public port.
 - Generate the dedicated-server config in `config/` and derive Minecraft target IP/port from `server.properties`.

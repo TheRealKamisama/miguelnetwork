@@ -1,12 +1,16 @@
 # Configuration and deployment
 
+This guide applies to MiguelNetwork 0.2.0. For the shorter installation and
+runtime-log checklist, see [`USER_GUIDE.md`](USER_GUIDE.md).
+
 MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` through NeoForge.
 The server configuration is a COMMON config so it is created in the documented top-level `config` directory, not under
 a world's `serverconfig` directory.
 
 The Mod reads the running Minecraft port and `server-ip` from `server.properties`. A blank/wildcard `server-ip` becomes
-the loopback target `127.0.0.1`; an explicit address is preserved. ZstdNet 1.4.7 is detected reflectively and its listen
-port becomes a higher-priority route. The resolved values are written on every start to
+the loopback target `127.0.0.1`; an explicit address is preserved. Supported ZstdNet versions (currently 1.4.7 and
+1.4.8) are detected reflectively and their listen port becomes a higher-priority route. The resolved values are written
+on every start to
 `config/miguelnetwork/generated/detected-server.toml`; this generated file is diagnostic and must not be edited.
 
 `publicPort` cannot equal `server-port` or the detected ZstdNet port: the public gateway/wstunnel listener and the
@@ -155,3 +159,14 @@ verifyTlsCertificates = true
 The client tries Discovery on the logical endpoint over HTTPS and then HTTP. The returned route supplies its public
 WS/WSS endpoint and the automatically detected backend host/port. If Discovery is absent, the legacy WSS → WS → TCP
 probe remains available; only that compatibility path retains the old fixed target-port convention.
+
+## Verifying an installed deployment
+
+After restarting both sides, inspect `logs/latest.log` on the server and client.
+The server should report `standalone WS gateway is ready` and
+`Discovery and wstunnel share one port`. The client should report `selected Discovery
+route`. A `Discovery unavailable`, `selected legacy ... route`, or
+`discovered vanilla TCP endpoint` message means that Discovery was unavailable and
+the compatibility path was used or the connection stayed on vanilla TCP. Set
+`legacyFallback = false` to make that condition fail closed instead of silently
+downgrading.

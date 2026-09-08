@@ -105,6 +105,8 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
 - Long-duration gameplay, forced network-loss recovery and multi-day memory stability.
+- A fresh 0.2.0 deployment with `legacyFallback = false` proving a complete session fails closed if Discovery becomes
+  unavailable.
 
 ## ATM10 and trusted WSS validation
 
@@ -125,9 +127,32 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
   stack. Those performance symptoms were not attributed to MiguelNetwork and mean this was a compatibility and
   transport test, not a clean long-duration performance baseline.
 
+## Standalone gateway and Discovery validation
+
+On 2026-09-08, the active ATM10 deployment was inspected on both the Linux server and Windows client. The installed
+MiguelNetwork artifact was still `0.1.0-alpha.6`, and both sides had ZstdNet 1.4.7. The server configuration and live
+listener topology confirmed all of the following:
+
+- `mode = "STANDALONE"`, `enabled = true`, plain WS, and public port 35548.
+- The Java process owned the public port while wstunnel listened only on a dynamic loopback port without TLS.
+- Minecraft remained on loopback port 25567 and ZstdNet on port 25566.
+- A live connection crossed public gateway -> loopback wstunnel -> ZstdNet, confirming that the built-in gateway was
+  carrying traffic rather than an independently exposed backend.
+
+The successful client status request selected `minecraft-primary` through the Discovery-supplied WS route to port
+25567. The subsequent login selected `zstdnet-primary`, composed the supported ZstdNet adapter, and reached port 25566;
+the corresponding server log identified the Minecraft handshake as ZSTD mode. Those successful connections did not use
+the legacy probe.
+
+The same client log also contained an earlier attempt where Discovery returned HTTP 502 and `legacyFallback = true`
+allowed selection of `legacy:wss`. The successful connection is therefore validated as Discovery-routed, but the whole
+client session is not a strict no-fallback run. Set `legacyFallback = false`, clear/restart the client log, and repeat
+the acceptance path when a release must demonstrate Discovery-only fail-closed behavior.
+
 ## Current interpretation
 
-The sidecar transport, binary packaging, NeoForge build and chosen central connection hook are technically viable. A
-real Minecraft status Ping, login and playable session have crossed WSS twice, and a cross-host status Ping has crossed
-plain WS between Windows and Linux. Phase 0 has therefore validated the core architecture; public-internet gameplay,
-trusted-certificate and broader compatibility validation remain before a production-ready release.
+The sidecar transport, binary packaging, NeoForge build and chosen central connection hook are technically viable.
+Status Ping, login and playable sessions have crossed local and trusted public WSS; cross-host and public plain WS have
+also been exercised. The built-in standalone gateway and Discovery-selected raw/ZstdNet routes are now evidenced by
+matching client/server logs. Broader compatibility, abnormal-shutdown cleanup, long-duration stability, and a strict
+Discovery-only 0.2.0 run remain before calling the release production-ready.
