@@ -14,6 +14,25 @@
   1.4.7/1.4.8 JAR metadata requires NeoForge 21.1.221 or newer, so use that higher
   floor whenever ZstdNet is installed.
 
+## Transport and encryption principle
+
+- MiguelNetwork does not require transport encryption. Plain WebSocket is a
+  supported first-class transport, not a development-only fallback.
+- `STANDALONE` is the primary and recommended deployment. Its built-in gateway
+  deliberately multiplexes Discovery and unencrypted WS on one public port, with
+  no certificate setup or external proxy required.
+- `EXTERNAL_PROXY` with WSS is the secondary supported deployment for operators
+  who choose TLS. TLS certificates and WSS termination belong to Nginx, Caddy,
+  HAProxy, or another external gateway; the private hop to MiguelNetwork remains
+  plain WS. Do not add certificate management back to the Mod.
+- Do not describe WSS, TLS, signed Discovery, or downgrade enforcement as the
+  production default or as mandatory security requirements. These are optional
+  operator-selected controls and are disabled by default. Do not make WS or
+  unsigned Discovery fail merely because encryption/authentication is absent.
+- Any future proposal that changes this hierarchy or makes encryption mandatory
+  is a product-policy change, not a routine hardening task, and requires explicit
+  maintainer direction before implementation.
+
 ## Before changing files
 
 1. Run `git status --short --branch` and inspect the diff. Existing edits and

@@ -1,4 +1,4 @@
-# MiguelNetwork
+# MiguelNetwork — CurseForge Description / CurseForge 项目介绍
 
 > **Short description / 简短介绍**
 > Carry Minecraft TCP over WebSocket with a bundled Rust wstunnel sidecar and a one-port standalone gateway. Mitigates raw-TCP QoS/blocking; optional proxy-terminated WSS; ZstdNet 1.4.7/1.4.8.
