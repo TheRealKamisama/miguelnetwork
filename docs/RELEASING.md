@@ -28,9 +28,10 @@ Create a GitHub Actions environment named `curseforge`. Configure it with:
 - environment secret `CURSEFORGE_API_TOKEN`: a CurseForge upload API token;
 - environment variable `CURSEFORGE_PROJECT_ID`: the numeric MiguelNetwork CurseForge project ID.
 
-The workflow queries CurseForge's authenticated version catalog before building and resolves the numeric IDs for
-Minecraft 1.21.1 and NeoForge by name. This avoids storing unstable numeric game-version IDs in repository settings and
-also fails early if the token is invalid or the required platform entries cannot be resolved exactly.
+The workflow queries CurseForge's authenticated version and version-type catalogs before building. It resolves the
+numeric IDs for Minecraft 1.21.1 within the `minecraft-1-21` type, NeoForge within the Modloader type, and both Client
+and Server within the Environment type. This avoids storing unstable numeric IDs in repository settings, disambiguates
+duplicate display names, and fails early if the token is invalid or any required entry cannot be resolved exactly.
 
 Environment protection rules are recommended so that a maintainer approves each public upload. Do not put an API token
 in `gradle.properties`, workflow YAML, commits, tags, or release archives.

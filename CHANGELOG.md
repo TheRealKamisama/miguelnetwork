@@ -6,6 +6,7 @@
 - Verify native binary hashes and required licensing/provenance files inside the final Mod JAR.
 - Pin the Gradle 8.9 distribution SHA-256 used by the checked-in wrapper.
 - Add tag-driven GitHub Release, artifact attestation, checksums, and CurseForge publishing automation.
+- Resolve CurseForge upload metadata within the correct game, loader, and client/server version types.
 
 ## 0.2.0 - 2026-09-08
 

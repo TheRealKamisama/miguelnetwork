@@ -48,14 +48,35 @@ jobs:
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
             -H "User-Agent: MiguelNetwork GitHub Actions release" \
             "https://minecraft.curseforge.com/api/game/versions")
-          game_version_ids=$(jq -c '
-            [.[] | select(.name == "1.21.1" or .name == "NeoForge") | .id] | unique
-          ' <<< "$version_catalog")
-          if ! jq -e 'length == 2 and all(.[]; type == "number")' \
+          version_types=$(curl --fail-with-body --silent --show-error \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            -H "User-Agent: MiguelNetwork GitHub Actions release" \
+            "https://minecraft.curseforge.com/api/game/version-types")
+          game_version_ids=$(jq -cn \
+            --argjson versions "$version_catalog" \
+            --argjson types "$version_types" '
+              ($types | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+              [$versions[] |
+                ($typeSlug[(.gameVersionTypeID | tostring)] // "") as $type |
+                select(
+                  ($type == "minecraft-1-21" and .name == "1.21.1") or
+                  (($type | startswith("modloader")) and .name == "NeoForge") or
+                  (($type | startswith("environment")) and (.name == "Client" or .name == "Server"))
+                ) |
+                .id
+              ] | unique
+            ')
+          if ! jq -e 'length == 4 and all(.[]; type == "number")' \
             <<< "$game_version_ids" >/dev/null; then
-            echo "Expected unique CurseForge entries for Minecraft 1.21.1 and NeoForge" >&2
-            jq -r '.[] | select(.name == "1.21.1" or .name == "NeoForge") | [.id, .name] | @tsv' \
-              <<< "$version_catalog" >&2
+            echo "Expected unique CurseForge entries for Minecraft 1.21.1, NeoForge, Client, and Server" >&2
+            jq -nr \
+              --argjson versions "$version_catalog" \
+              --argjson types "$version_types" '
+                ($types | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+                $versions[] |
+                select(.name == "1.21.1" or .name == "NeoForge" or .name == "Client" or .name == "Server") |
+                [.id, .name, ($typeSlug[(.gameVersionTypeID | tostring)] // "unknown")] | @tsv
+              ' >&2
             exit 1
           fi
           echo "game_version_ids=$game_version_ids" >> "$GITHUB_OUTPUT"
@@ -121,7 +142,7 @@ jobs:
 
           response=$(curl --fail-with-body --silent --show-error \
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
-            -F "metadata=$metadata;type=application/json" \
+            -F "metadata=$metadata" \
             -F "file=@$RELEASE_JAR;type=application/java-archive" \
             "https://minecraft.curseforge.com/api/projects/$CURSEFORGE_PROJECT_ID/upload-file")
           echo "$response" | jq .

@@ -61,8 +61,9 @@ Do not infer a GitHub repository from the project name.
       or `gh secret set`; never paste it into an issue, chat, workflow, or commit.
 - [ ] Set environment variable `CURSEFORGE_PROJECT_ID` to the numeric MiguelNetwork
       CurseForge project ID.
-- [ ] Confirm the workflow can use the token to resolve exactly one Minecraft
-      1.21.1 entry and one NeoForge entry from CurseForge's version catalog.
+- [ ] Confirm the workflow can use the token and version-type catalog to resolve
+      exactly one Minecraft 1.21.1 entry, one NeoForge entry, and the Client and
+      Server environment entries.
 - [ ] Review any environment protection rules and required reviewers.
 
 See `docs/RELEASING.md` for the secure `gh` commands and automated workflow details.
