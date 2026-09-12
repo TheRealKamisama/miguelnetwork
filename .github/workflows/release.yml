@@ -144,9 +144,28 @@ jobs:
             '{changelog: $changelog, changelogType: "markdown", displayName: $displayName,
               gameVersions: $gameVersions, releaseType: $releaseType}')
 
-          response=$(curl --fail-with-body --silent --show-error \
+          response_file="$RUNNER_TEMP/curseforge-upload-response.json"
+          set +e
+          http_status=$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
             -F "metadata=$metadata" \
             -F "file=@$RELEASE_JAR;type=application/java-archive" \
             "https://minecraft.curseforge.com/api/projects/$CURSEFORGE_PROJECT_ID/upload-file")
-          echo "$response" | jq .
+          curl_status=$?
+          set -e
+
+          if [[ -s "$response_file" ]]; then
+            jq . "$response_file" 2>/dev/null || cat "$response_file"
+          fi
+          if [[ $curl_status -ne 0 ]]; then
+            echo "CurseForge upload transport failed with curl exit code $curl_status" >&2
+            exit "$curl_status"
+          fi
+          if [[ "$http_status" != 200 && "$http_status" != 201 ]]; then
+            echo "CurseForge upload failed with HTTP $http_status" >&2
+            exit 1
+          fi
+          file_id=$(jq -er '.id | select(type == "number")' "$response_file")
+          echo "CurseForge accepted file ID $file_id"
