@@ -44,19 +44,23 @@ jobs:
           [[ -n "$CURSEFORGE_API_TOKEN" ]] || { echo "Missing CURSEFORGE_API_TOKEN secret" >&2; exit 1; }
           [[ "$CURSEFORGE_PROJECT_ID" =~ ^[0-9]+$ ]] || { echo "CURSEFORGE_PROJECT_ID must be numeric" >&2; exit 1; }
 
-          version_catalog=$(curl --fail-with-body --silent --show-error \
+          version_catalog="$RUNNER_TEMP/curseforge-game-versions.json"
+          version_types="$RUNNER_TEMP/curseforge-game-version-types.json"
+          curl --fail-with-body --silent --show-error \
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
             -H "User-Agent: MiguelNetwork GitHub Actions release" \
-            "https://minecraft.curseforge.com/api/game/versions")
-          version_types=$(curl --fail-with-body --silent --show-error \
+            --output "$version_catalog" \
+            "https://minecraft.curseforge.com/api/game/versions"
+          curl --fail-with-body --silent --show-error \
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
             -H "User-Agent: MiguelNetwork GitHub Actions release" \
-            "https://minecraft.curseforge.com/api/game/version-types")
+            --output "$version_types" \
+            "https://minecraft.curseforge.com/api/game/version-types"
           game_version_ids=$(jq -cn \
-            --argjson versions "$version_catalog" \
-            --argjson types "$version_types" '
-              ($types | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
-              [$versions[] |
+            --slurpfile versions "$version_catalog" \
+            --slurpfile types "$version_types" '
+              ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+              [$versions[0][] |
                 ($typeSlug[(.gameVersionTypeID | tostring)] // "") as $type |
                 select(
                   ($type == "minecraft-1-21" and .name == "1.21.1") or
@@ -70,10 +74,10 @@ jobs:
             <<< "$game_version_ids" >/dev/null; then
             echo "Expected unique CurseForge entries for Minecraft 1.21.1, NeoForge, Client, and Server" >&2
             jq -nr \
-              --argjson versions "$version_catalog" \
-              --argjson types "$version_types" '
-                ($types | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
-                $versions[] |
+              --slurpfile versions "$version_catalog" \
+              --slurpfile types "$version_types" '
+                ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+                $versions[0][] |
                 select(.name == "1.21.1" or .name == "NeoForge" or .name == "Client" or .name == "Server") |
                 [.id, .name, ($typeSlug[(.gameVersionTypeID | tostring)] // "unknown")] | @tsv
               ' >&2
