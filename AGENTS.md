@@ -61,7 +61,7 @@ replace the wrapper with an unpinned system Gradle.
 
 Before hand-off, run `git diff --check`, inspect `git diff`, and record the exact
 artifact path and SHA-256. A successful build produces
-`build/libs/miguelnetwork-<mod_version>.jar`.
+`build/libs/miguelnetwork-neoforge-1.21.1-<mod_version>.jar`.
 
 ## Code and documentation rules
 

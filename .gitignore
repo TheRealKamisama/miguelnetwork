@@ -8,3 +8,4 @@ out/
 .agents/
 .codex/
 
+src/main/resources/native/

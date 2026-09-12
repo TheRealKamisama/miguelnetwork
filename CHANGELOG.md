@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Download and verify pinned upstream wstunnel release archives as part of the Gradle build.
+- Verify native binary hashes and required licensing/provenance files inside the final Mod JAR.
+- Pin the Gradle 8.9 distribution SHA-256 used by the checked-in wrapper.
+- Add tag-driven GitHub Release, artifact attestation, checksums, and CurseForge publishing automation.
+
 ## 0.2.0 - 2026-09-08
 
 - Promote the standalone gateway, Discovery v1 routing, automatic endpoint detection, and optional ZstdNet 1.4.7/1.4.8

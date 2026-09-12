@@ -1,0 +1,127 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  id-token: write
+  attestations: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: curseforge
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+      - name: Read and validate release version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          ./gradlew verifyReleaseVersion --no-daemon -PreleaseVersion="$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Validate CurseForge configuration
+        id: curseforge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        shell: bash
+        run: |
+          [[ -n "$CURSEFORGE_API_TOKEN" ]] || { echo "Missing CURSEFORGE_API_TOKEN secret" >&2; exit 1; }
+          [[ "$CURSEFORGE_PROJECT_ID" =~ ^[0-9]+$ ]] || { echo "CURSEFORGE_PROJECT_ID must be numeric" >&2; exit 1; }
+
+          version_catalog=$(curl --fail-with-body --silent --show-error \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            -H "User-Agent: MiguelNetwork GitHub Actions release" \
+            "https://minecraft.curseforge.com/api/game/versions")
+          game_version_ids=$(jq -c '
+            [.[] | select(.name == "1.21.1" or .name == "NeoForge") | .id] | unique
+          ' <<< "$version_catalog")
+          if ! jq -e 'length == 2 and all(.[]; type == "number")' \
+            <<< "$game_version_ids" >/dev/null; then
+            echo "Expected unique CurseForge entries for Minecraft 1.21.1 and NeoForge" >&2
+            jq -r '.[] | select(.name == "1.21.1" or .name == "NeoForge") | [.id, .name] | @tsv' \
+              <<< "$version_catalog" >&2
+            exit 1
+          fi
+          echo "game_version_ids=$game_version_ids" >> "$GITHUB_OUTPUT"
+      - name: Build and test release
+        run: ./gradlew clean build --no-daemon
+      - name: Locate release JAR
+        id: artifact
+        shell: bash
+        run: |
+          shopt -s nullglob
+          jars=(build/libs/*.jar)
+          if [[ ${#jars[@]} -ne 1 ]]; then
+            echo "Expected exactly one release JAR, found ${#jars[@]}" >&2
+            exit 1
+          fi
+          echo "path=${jars[0]}" >> "$GITHUB_OUTPUT"
+          echo "name=$(basename "${jars[0]}")" >> "$GITHUB_OUTPUT"
+          sha256sum "${jars[0]}" > SHA256SUMS
+      - name: Attest release artifact
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: ${{ steps.artifact.outputs.path }}
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${{ steps.artifact.outputs.path }}" SHA256SUMS --clobber
+          else
+            release_flags=()
+            if [[ "$RELEASE_VERSION" == *alpha* || "$RELEASE_VERSION" == *beta* ]]; then
+              release_flags+=(--prerelease)
+            fi
+            gh release create "$GITHUB_REF_NAME" \
+              "${{ steps.artifact.outputs.path }}" SHA256SUMS \
+              --verify-tag \
+              --title "MiguelNetwork $RELEASE_VERSION" \
+              --generate-notes \
+              "${release_flags[@]}"
+          fi
+      - name: Publish to CurseForge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_GAME_VERSION_IDS: ${{ steps.curseforge.outputs.game_version_ids }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_JAR: ${{ steps.artifact.outputs.path }}
+        shell: bash
+        run: |
+          release_type=release
+          [[ "$RELEASE_VERSION" == *alpha* ]] && release_type=alpha
+          [[ "$RELEASE_VERSION" == *beta* ]] && release_type=beta
+
+          metadata=$(jq -cn \
+            --arg changelog "$(cat CHANGELOG.md)" \
+            --arg displayName "MiguelNetwork $RELEASE_VERSION" \
+            --arg releaseType "$release_type" \
+            --argjson gameVersions "$CURSEFORGE_GAME_VERSION_IDS" \
+            '{changelog: $changelog, changelogType: "markdown", displayName: $displayName,
+              gameVersions: $gameVersions, releaseType: $releaseType}')
+
+          response=$(curl --fail-with-body --silent --show-error \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            -F "metadata=$metadata;type=application/json" \
+            -F "file=@$RELEASE_JAR;type=application/java-archive" \
+            "https://minecraft.curseforge.com/api/projects/$CURSEFORGE_PROJECT_ID/upload-file")
+          echo "$response" | jq .

@@ -1,8 +1,8 @@
 # Release checklist
 
-This checklist prepares a local artifact for a future GitHub release. It does not
-authorize a commit, tag, push, GitHub login, repository creation, or release
-publication.
+This checklist covers local release preparation and the tag-driven GitHub Actions
+publication flow. It does not itself authorize a commit, tag, push, GitHub login,
+or release publication.
 
 ## Repository and version gate
 
@@ -54,15 +54,36 @@ gh auth status
 The current checkout's `source` remote may be a local mirror rather than GitHub.
 Do not infer a GitHub repository from the project name.
 
-## Future publication (explicit approval required)
+## CurseForge automation gate
+
+- [ ] Confirm that the GitHub Actions environment is named exactly `curseforge`.
+- [ ] Configure the environment secret `CURSEFORGE_API_TOKEN` through GitHub's UI
+      or `gh secret set`; never paste it into an issue, chat, workflow, or commit.
+- [ ] Set environment variable `CURSEFORGE_PROJECT_ID` to the numeric MiguelNetwork
+      CurseForge project ID.
+- [ ] Confirm the workflow can use the token to resolve exactly one Minecraft
+      1.21.1 entry and one NeoForge entry from CurseForge's version catalog.
+- [ ] Review any environment protection rules and required reviewers.
+
+See `docs/RELEASING.md` for the secure `gh` commands and automated workflow details.
+
+## Tag publication (explicit approval required)
 
 After the user confirms the remote, release notes, tag, and publication scope:
 
 1. Make a focused release commit containing only reviewed changes.
-2. Create and verify the requested version tag.
-3. Push the branch/tag to the confirmed GitHub remote.
-4. Create the GitHub Release and attach the JAR plus checksum and required notices.
-5. Verify the published asset and workflow result, then report the URLs and checksums.
+2. Create an annotated tag named exactly `v<mod_version>` and verify it.
+3. Push the branch and tag to the confirmed GitHub remote. Pushing the tag starts
+   `.github/workflows/release.yml`.
+4. Approve the `curseforge` environment deployment if protection rules require it.
+5. Verify that the workflow built and checked the JAR, published the JAR and
+   `SHA256SUMS` to the GitHub Release, created the provenance attestation, and
+   uploaded the same JAR to CurseForge.
+6. Record the GitHub Release URL, CurseForge file URL, and SHA-256.
+
+Do not manually upload the JAR again after the workflow succeeds. If a retry is
+needed after the CurseForge upload step may have completed, inspect the project
+files first to avoid publishing a duplicate.
 
 Do not place private keys or full runtime logs in a release archive. The license
 audit is explicitly preliminary; complete the attribution/SBOM gate before calling

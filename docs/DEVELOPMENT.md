@@ -34,7 +34,7 @@ Useful local checks:
 ```text
 git diff --check
 git status --short --branch
-jar tf build/libs/miguelnetwork-0.2.0.jar | Select-String 'neoforge.mods.toml|wstunnel-manifest|native/'
+jar tf build/libs/miguelnetwork-neoforge-1.21.1-0.2.0.jar | Select-String 'neoforge.mods.toml|wstunnel-manifest|native/'
 ```
 
 The final `jar` inspection is illustrative for PowerShell; on POSIX systems use
