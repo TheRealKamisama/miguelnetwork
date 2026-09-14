@@ -63,8 +63,8 @@ jobs:
               [$versions[0][] |
                 ($typeSlug[(.gameVersionTypeID | tostring)] // "") as $type |
                 select(
-                  ($type == "minecraft-1-21" and .name == "1.21.1") or
-                  (($type | startswith("modloader")) and .name == "NeoForge") or
+                  ($type == "minecraft-1-21" and .name == "1.20.1") or
+                  (($type | startswith("modloader")) and .name == "Forge") or
                   (($type | startswith("environment")) and (.name == "Client" or .name == "Server"))
                 ) |
                 .id
@@ -72,13 +72,13 @@ jobs:
             ')
           if ! jq -e 'length == 4 and all(.[]; type == "number")' \
             <<< "$game_version_ids" >/dev/null; then
-            echo "Expected unique CurseForge entries for Minecraft 1.21.1, NeoForge, Client, and Server" >&2
+            echo "Expected unique CurseForge entries for Minecraft 1.20.1, Forge, Client, and Server" >&2
             jq -nr \
               --slurpfile versions "$version_catalog" \
               --slurpfile types "$version_types" '
                 ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
                 $versions[0][] |
-                select(.name == "1.21.1" or .name == "NeoForge" or .name == "Client" or .name == "Server") |
+                select(.name == "1.21.1" or .name == "Forge" or .name == "Client" or .name == "Server") |
                 [.id, .name, ($typeSlug[(.gameVersionTypeID | tostring)] // "unknown")] | @tsv
               ' >&2
             exit 1

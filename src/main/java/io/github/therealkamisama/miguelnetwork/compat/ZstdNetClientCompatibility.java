@@ -4,7 +4,7 @@ import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -25,6 +25,7 @@ public final class ZstdNetClientCompatibility {
         if (cached != null) {
             return cached;
         }
+
         boolean result = ModList.get().getModContainerById("zstdnet")
                 .map(container -> ZstdNetServerCompatibility.isSupportedVersion(
                         container.getModInfo().getVersion().toString()))

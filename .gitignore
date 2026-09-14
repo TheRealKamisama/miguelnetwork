@@ -1,11 +1,26 @@
-.gradle/
-build/
-run/
-out/
-*.log
+# eclipse
+bin
+*.launch
+.settings
+.metadata
+.classpath
+.project
 
-# Local coding-agent state; repository instructions belong in AGENTS.md.
-.agents/
-.codex/
+# idea
+out
+*.ipr
+*.iws
+*.iml
+.idea
 
-src/main/resources/native/
+# gradle
+build
+.gradle
+
+# other
+eclipse
+run
+runs
+run-data
+
+repo

@@ -10,7 +10,7 @@ import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import net.minecraft.server.MinecraftServer;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
