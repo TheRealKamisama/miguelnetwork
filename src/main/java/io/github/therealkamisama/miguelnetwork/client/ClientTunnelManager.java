@@ -12,7 +12,7 @@ import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryFilter;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryManifest;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryRoute;
-import net.neoforged.fml.loading.FMLPaths;
+import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

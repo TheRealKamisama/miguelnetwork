@@ -1,7 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.compat;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
-import net.neoforged.fml.ModList;
+import net.minecraftforge.fml.ModList;
 
 import java.lang.reflect.Method;
 import java.util.OptionalInt;
