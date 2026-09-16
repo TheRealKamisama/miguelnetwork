@@ -1,8 +1,11 @@
 # ZstdNet compatibility
 
 MiguelNetwork `0.2.0` contains the unilateral compatibility adapter introduced in
-alpha.6 for ZstdNet `1.4.7` and `1.4.8` on Minecraft 1.21.1 NeoForge. ZstdNet
-itself and its JAR are not modified, and no Zstd compression code is copied.
+alpha.6 for ZstdNet `1.4.7` and `1.4.8`. This branch targets Minecraft 1.20.1
+Forge. The pinned Forge `1.4.8` dependency (CurseForge file `8752125`) has the
+expected hook fields and reflective methods. The inherited `1.4.7` allowlist
+entry has not been independently verified on Forge; use Forge `1.4.8` here.
+ZstdNet itself and its JAR are not modified, and no Zstd compression code is copied.
 
 ## Byte-stream composition
 

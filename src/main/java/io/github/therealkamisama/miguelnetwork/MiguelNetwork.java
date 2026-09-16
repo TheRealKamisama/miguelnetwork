@@ -25,7 +25,7 @@ public final class MiguelNetwork {
 
     public MiguelNetwork() {
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "miguelnetwork-client.toml");
-        // COMMON configs are materialized in config/. NeoForge SERVER configs live under a world's serverconfig
+        // COMMON configs are materialized in config/. Forge SERVER configs live under a world's serverconfig
         // directory, which made the documented dedicated-server file appear to be missing.
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ServerConfig.SPEC, "miguelnetwork-server.toml");
         MinecraftForge.EVENT_BUS.register(this);

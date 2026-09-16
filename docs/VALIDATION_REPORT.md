@@ -1,5 +1,9 @@
 # Phase 0 validation report
 
+This report records historical NeoForge 1.21.1 validation. It does not establish
+Forge 1.20.1 runtime compatibility. See [FORGE_VALIDATION.md](FORGE_VALIDATION.md)
+for this branch's build verification and scope.
+
 > Historical note: this report records alpha.1-alpha.5 validation configurations. Alpha.6 defaults to standalone WS
 > and makes Discovery signing/WSS downgrade enforcement optional. See `CONFIGURATION.md` for current deployment.
 

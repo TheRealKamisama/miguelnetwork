@@ -2,7 +2,7 @@
 
 ## Project contract
 
-- MiguelNetwork is a Java 21 NeoForge mod for Minecraft 1.21.1. It bundles the pinned
+- This branch is a Java 17 Forge mod for Minecraft 1.20.1. It bundles the pinned
   `wstunnel` 10.7.1 binaries for Windows x86-64 and Linux x86-64.
 - `STANDALONE` is the default server mode: the built-in gateway serves Discovery and
   forwards WebSocket traffic on `server.publicPort`. `EXTERNAL_PROXY` is for Nginx or
@@ -10,9 +10,10 @@
 - Discovery v1 is the normal client control path. The client may use its legacy
   WSS/WS/TCP probe only when Discovery is unavailable and `legacyFallback` is enabled.
   ZstdNet compatibility is intentionally version-gated to 1.4.7 and 1.4.8.
-- MiguelNetwork itself is compiled against NeoForge 21.1.77. The verified ZstdNet
-  1.4.7/1.4.8 JAR metadata requires NeoForge 21.1.221 or newer, so use that higher
-  floor whenever ZstdNet is installed.
+- MiguelNetwork itself is compiled against Forge 47.1.3. The pinned optional
+  development dependency is ZstdNet 1.4.8 for Forge 1.20.1 (CurseForge file 8752125).
+  Its reflective API has been checked; the inherited 1.4.7 gate is not evidence
+  that a Forge 1.4.7 build has been verified. Never install a NeoForge JAR here.
 
 ## Transport and encryption principle
 
@@ -51,17 +52,19 @@ Use the checked-in Gradle wrapper so the Gradle version is reproducible:
 ```text
 .\gradlew.bat test                 # unit tests
 .\gradlew.bat build --no-daemon   # tests plus the distributable JAR
-.\gradlew.bat clean test jar      # release-preparation build
+.\gradlew.bat clean build         # tests, reobfuscation, and distribution checks
 ```
 
 On a POSIX shell, use `./gradlew` instead. If dependency resolution fails, record
-the first network/repository error and retry only after checking Java 21,
+the first network/repository error and retry only after checking Java 17,
 `gradle/wrapper/gradle-wrapper.properties`, and the local Gradle cache. Do not
 replace the wrapper with an unpinned system Gradle.
 
 Before hand-off, run `git diff --check`, inspect `git diff`, and record the exact
 artifact path and SHA-256. A successful build produces
-`build/libs/miguelnetwork-neoforge-1.21.1-<mod_version>.jar`.
+`build/libs/miguelnetwork-forge-1.20.1-<mod_version>.jar`. The `build/devlibs/`
+JAR is not a distribution. `verifyDistribution` checks the reobfuscated JAR's
+Forge metadata, Mixin manifest/refmap, Java 17 bytecode, natives, and notices.
 
 ## Code and documentation rules
 
@@ -92,3 +95,14 @@ documentation. Do not log in to GitHub, create a repository/release, tag, commit
 push, or publish an artifact unless the user explicitly requests that exact
 operation. The current remote may be a local mirror; verify it before any future
 GitHub operation. Follow `docs/RELEASE_CHECKLIST.md` for the remaining gate.
+
+## Commit attribution
+
+- When the user authorizes a commit, preserve the user as its primary author:
+  `TheRealKamisama <TheRealKamisama@163.com>`, unless the user explicitly supplies
+  a different author identity. Do not replace the author with an agent identity.
+- Every Codex-assisted commit must include this exact trailer, separated from
+  the message body by a blank line:
+  `Co-authored-by: Codex <codex@openai.com>`.
+- Verify the author and trailer with `git show --format=full` after committing.
+  This attribution rule does not itself authorize commits, pushes, or releases.

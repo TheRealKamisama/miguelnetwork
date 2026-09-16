@@ -64,7 +64,7 @@ class ClientTransportProbeTest {
     @Test
     void fallsBackWhenEndpointIsNotWstunnel() throws Exception {
         try (ServerSocket server = new ServerSocket(0, 2, InetAddress.getLoopbackAddress())) {
-            Thread rejector = Thread.ofPlatform().start(() -> {
+            Thread rejector = new Thread(() -> {
                 for (int attempt = 0; attempt < 2; attempt++) {
                     try (var ignored = server.accept()) {
                         // Reject both the TLS and plain HTTP Upgrade probes.
@@ -73,6 +73,8 @@ class ClientTransportProbeTest {
                     }
                 }
             });
+            rejector.setDaemon(true);
+            rejector.start();
 
             assertTrue(ClientTransportProbe.detect(
                     "127.0.0.1",

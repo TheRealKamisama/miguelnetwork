@@ -43,7 +43,7 @@ base {
 }
 
 // Mojang ships Java 17 to end users in 1.20.1, so mods should target Java 17.
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+java.toolchain.languageVersion = JavaLanguageVersion.of(17)
 
 legacyForge {
     // Specify the version of MinecraftForge to use.
@@ -145,8 +145,6 @@ tasks.named('test', Test).configure {
     useJUnitPlatform()
 }
 
-// Uncomment the lines below if you wish to configure mixin. The mixin file should be named modid.mixins.json.
-/*
 mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.mixins.json"
@@ -161,7 +159,6 @@ jar {
             "MixinConfigs": "${mod_id}.mixins.json"
     ])
 }
-*/
 
 // This block of code expands all declared replace properties in the specified resource targets.
 // A missing property will result in an error. Properties are expanded using ${} Groovy notation.
@@ -306,11 +303,53 @@ tasks.named('processResources', ProcessResources).configure {
 def verifyDistribution = tasks.register('verifyDistribution') {
     group = 'verification'
     description = 'Verifies native binaries and required notices in the distributable Mod JAR.'
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('reobfJar')
 
     doLast {
-        File jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        File jarFile = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar").get().asFile
         new ZipFile(jarFile).withCloseable { ZipFile zip ->
+            def manifestEntry = zip.getEntry('META-INF/MANIFEST.MF')
+            if (manifestEntry == null) {
+                throw new GradleException('Distribution is missing its JAR manifest')
+            }
+            def manifest = new java.util.jar.Manifest(zip.getInputStream(manifestEntry))
+            if (manifest.mainAttributes.getValue('MixinConfigs') != "${mod_id}.mixins.json") {
+                throw new GradleException('Distribution does not register the MiguelNetwork Mixins')
+            }
+            def mixinEntry = zip.getEntry("${mod_id}.mixins.json")
+            def refmapEntry = zip.getEntry("${mod_id}.refmap.json")
+            if (mixinEntry == null || refmapEntry == null) {
+                throw new GradleException('Distribution is missing its Mixin config or refmap')
+            }
+            def mixinConfig = new JsonSlurper().parse(zip.getInputStream(mixinEntry))
+            if (mixinConfig.refmap != "${mod_id}.refmap.json" || mixinConfig.compatibilityLevel != 'JAVA_17') {
+                throw new GradleException('Distribution has an invalid Mixin refmap or Java compatibility level')
+            }
+            def refmap = new JsonSlurper().parse(zip.getInputStream(refmapEntry))
+            def connectionMappings = refmap.mappings['io/github/therealkamisama/miguelnetwork/mixin/ConnectionMixin']
+            if (!connectionMappings || !connectionMappings.values().any { it.contains('m_') }) {
+                throw new GradleException('Distribution is missing the ConnectionMixin SRG mapping')
+            }
+            def metadataEntry = zip.getEntry('META-INF/mods.toml')
+            if (metadataEntry == null || zip.getEntry('META-INF/neoforge.mods.toml') != null) {
+                throw new GradleException('Distribution must contain only Forge mod metadata')
+            }
+            String modMetadataText = zip.getInputStream(metadataEntry).getText('UTF-8')
+            if (!modMetadataText.contains('versionRange="[1.20.1]"') || !modMetadataText.contains("version=\"${project.version}\"")) {
+                throw new GradleException('Distribution has an incorrect Minecraft or Mod version')
+            }
+            zip.entries().each { entry ->
+                if (entry.name.endsWith('.class')) {
+                    zip.getInputStream(entry).withCloseable { input ->
+                        def data = new DataInputStream(input)
+                        data.readInt() // Class file magic.
+                        data.readUnsignedShort() // Minor version.
+                        if (data.readUnsignedShort() > 61) {
+                            throw new GradleException("Distribution class requires a newer JVM than Java 17: ${entry.name}")
+                        }
+                    }
+                }
+            }
             wstunnelManifest.platforms.each { String platformName, Map metadata ->
                 String executableName = platformName.startsWith('windows-') ? 'wstunnel.exe' : 'wstunnel'
                 String entryName = "native/${platformName}/${executableName}"
@@ -378,6 +417,7 @@ publishing {
 }
 
 tasks.withType(JavaCompile).configureEach {
+    options.release = 17
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
 

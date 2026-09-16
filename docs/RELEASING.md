@@ -1,6 +1,6 @@
 # Build and release
 
-MiguelNetwork builds with Java 21. The standard build downloads the pinned official wstunnel archives, validates the
+MiguelNetwork builds with Java 17. The standard build downloads the pinned official wstunnel archives, validates the
 archive and extracted executable SHA-256 values from
 `src/main/resources/META-INF/miguelnetwork/wstunnel-manifest.json`, and packages Windows x64 and Linux x64 executables
 into the Mod JAR.
@@ -17,9 +17,10 @@ For an offline or pre-downloaded build, place both archives named by the manifes
 ./gradlew build -PwstunnelArchiveDir=/absolute/path/to/archives
 ```
 
-`verifyDistribution`, which is part of `check` and therefore `build`, reopens the output JAR and verifies both native
-binary hashes plus the required MiguelNetwork and wstunnel legal/provenance files. The release filename is
-`miguelnetwork-neoforge-1.21.1-<version>.jar`.
+`verifyDistribution`, which is part of `check` and therefore `build`, reopens the reobfuscated output JAR and verifies
+Forge metadata, Mixin registration and SRG refmap, Java 17 bytecode, both native binary hashes, and the required
+MiguelNetwork and wstunnel legal/provenance files. The release filename is
+`miguelnetwork-forge-1.20.1-<version>.jar`.
 
 ## GitHub repository configuration
 
@@ -29,7 +30,7 @@ Create a GitHub Actions environment named `curseforge`. Configure it with:
 - environment variable `CURSEFORGE_PROJECT_ID`: the numeric MiguelNetwork CurseForge project ID.
 
 The workflow queries CurseForge's authenticated version and version-type catalogs before building. It resolves the
-numeric IDs for Minecraft 1.21.1 within the `minecraft-1-21` type, NeoForge within the Modloader type, and both Client
+numeric IDs for Minecraft 1.20.1 within the `minecraft-1-20` type, Forge within the Modloader type, and both Client
 and Server within the Environment type. This avoids storing unstable numeric IDs in repository settings, disambiguates
 duplicate display names, and fails early if the token is invalid or any required entry cannot be resolved exactly.
 

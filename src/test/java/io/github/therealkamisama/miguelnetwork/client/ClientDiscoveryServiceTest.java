@@ -50,8 +50,8 @@ class ClientDiscoveryServiceTest {
             DiscoveryManifest manifest = discovery.discover("127.0.0.1", port, Duration.ofSeconds(1));
 
             assertEquals(EndpointMatcher.formatEndpoint("127.0.0.1", port), manifest.audience());
-            assertEquals(TransportProtocol.WS, manifest.routes().getFirst().transport());
-            assertEquals(25567, manifest.routes().getFirst().wstunnelTargetPort());
+            assertEquals(TransportProtocol.WS, manifest.routes().get(0).transport());
+            assertEquals(25567, manifest.routes().get(0).wstunnelTargetPort());
         } finally {
             server.stop(0);
         }

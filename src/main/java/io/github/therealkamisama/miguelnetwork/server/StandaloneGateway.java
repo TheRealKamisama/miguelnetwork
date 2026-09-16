@@ -21,19 +21,26 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
 final class StandaloneGateway implements AutoCloseable {
     private static final int MAX_HEADER_BYTES = 32 * 1024;
     private static final int MAX_DISCOVERY_BODY_BYTES = 4096;
     private static final int HEADER_TIMEOUT_MILLIS = 10_000;
     private static final int UPSTREAM_CONNECT_TIMEOUT_MILLIS = 5_000;
+    private static final int MAX_CONNECTIONS = 128;
 
     private final ServerSocket listener;
     private final String upstreamHost;
     private final int upstreamPort;
     private final DiscoveryHandler discoveryHandler;
     private final ExecutorService connections;
+    private final Semaphore connectionSlots = new Semaphore(MAX_CONNECTIONS);
     private final Set<Socket> activeSockets = ConcurrentHashMap.newKeySet();
     private final Thread acceptThread;
     private volatile boolean running = true;
@@ -48,9 +55,18 @@ final class StandaloneGateway implements AutoCloseable {
         this.upstreamHost = upstreamHost;
         this.upstreamPort = upstreamPort;
         this.discoveryHandler = discoveryHandler;
-        this.connections = Executors.newThreadPerTaskExecutor(
-                Thread.ofVirtual().name("MiguelNetwork-gateway-connection-", 0).factory());
-        this.acceptThread = Thread.ofPlatform().daemon().name("MiguelNetwork-gateway-accept").unstarted(this::acceptLoop);
+        // Each admitted connection needs a worker in both directions. Do not use
+        // a fixed pool that can fill with readers while reverse copies queue up.
+        // Admission limits the cached pool to at most two workers per connection.
+        AtomicInteger workerSequence = new AtomicInteger();
+        this.connections = new ThreadPoolExecutor(0, MAX_CONNECTIONS * 2,
+                60, TimeUnit.SECONDS, new SynchronousQueue<>(), task -> {
+            Thread worker = new Thread(task, "MiguelNetwork-gateway-connection-" + workerSequence.getAndIncrement());
+            worker.setDaemon(true);
+            return worker;
+        });
+        this.acceptThread = new Thread(this::acceptLoop, "MiguelNetwork-gateway-accept");
+        this.acceptThread.setDaemon(true);
     }
 
     static StandaloneGateway start(
@@ -77,9 +93,29 @@ final class StandaloneGateway implements AutoCloseable {
         while (running) {
             try {
                 Socket client = listener.accept();
-                configure(client);
-                activeSockets.add(client);
-                connections.submit(() -> handle(client));
+                if (!running || !connectionSlots.tryAcquire()) {
+                    client.close();
+                    continue;
+                }
+                try {
+                    configure(client);
+                    activeSockets.add(client);
+                    connections.submit(() -> {
+                        try {
+                            handle(client);
+                        } finally {
+                            connectionSlots.release();
+                        }
+                    });
+                } catch (IOException | RejectedExecutionException exception) {
+                    activeSockets.remove(client);
+                    connectionSlots.release();
+                    client.close();
+                    if (running) {
+                        MiguelNetwork.LOGGER.debug("MiguelNetwork standalone gateway rejected connection: {}",
+                                exception.toString());
+                    }
+                }
             } catch (SocketException exception) {
                 if (running) {
                     MiguelNetwork.LOGGER.warn("MiguelNetwork standalone gateway accept failed", exception);
@@ -141,9 +177,13 @@ final class StandaloneGateway implements AutoCloseable {
     }
 
     private void proxy(Socket client, InputStream clientInput, byte[] initialHeader) throws Exception {
-        try (Socket upstream = new Socket()) {
+        Socket upstream = new Socket();
+        try (upstream) {
             configure(upstream);
             activeSockets.add(upstream);
+            if (!running) {
+                return;
+            }
             upstream.connect(new InetSocketAddress(upstreamHost, upstreamPort), UPSTREAM_CONNECT_TIMEOUT_MILLIS);
             client.setSoTimeout(0);
             upstream.setSoTimeout(0);
@@ -159,8 +199,9 @@ final class StandaloneGateway implements AutoCloseable {
                 upstream.close();
                 client.close();
                 reverse.cancel(true);
-                activeSockets.remove(upstream);
             }
+        } finally {
+            activeSockets.remove(upstream);
         }
     }
 
@@ -233,6 +274,13 @@ final class StandaloneGateway implements AutoCloseable {
             listener.close();
         } catch (IOException ignored) {
         }
+        // Stop admission before walking the sockets, so a just-accepted client
+        // cannot be added after the shutdown sweep.
+        try {
+            acceptThread.join(2_000);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+        }
         for (Socket socket : activeSockets) {
             try {
                 socket.close();
@@ -242,7 +290,7 @@ final class StandaloneGateway implements AutoCloseable {
         activeSockets.clear();
         connections.shutdownNow();
         try {
-            acceptThread.join(2_000);
+            connections.awaitTermination(2, TimeUnit.SECONDS);
         } catch (InterruptedException exception) {
             Thread.currentThread().interrupt();
         }

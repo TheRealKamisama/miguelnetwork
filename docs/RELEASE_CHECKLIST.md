@@ -20,14 +20,16 @@ or release publication.
 Run the wrapper from the repository root:
 
 ```text
-.\gradlew.bat clean test jar
+.\gradlew.bat clean build
 git diff --check
 ```
 
 - [ ] All tests pass and the JAR exists under `build/libs/`.
-- [ ] Inspect the JAR for `META-INF/neoforge.mods.toml`, the native binaries,
+- [ ] Inspect the JAR for `META-INF/mods.toml`, the native binaries,
       `wstunnel-manifest.json`, notices, and licenses.
 - [ ] Verify the embedded metadata reports the intended version.
+- [ ] Verify `MixinConfigs`, the ConnectionMixin SRG refmap, Java 17 class versions,
+      and the exact `[1.20.1]` Minecraft dependency in the production JAR.
 - [ ] Record a SHA-256 checksum (PowerShell: `Get-FileHash <jar> -Algorithm SHA256`).
 - [ ] Recheck the bundled wstunnel checksums and `docs/THIRD_PARTY_LICENSE_AUDIT.md`
       if native binaries or their version changed.
@@ -62,7 +64,7 @@ Do not infer a GitHub repository from the project name.
 - [ ] Set environment variable `CURSEFORGE_PROJECT_ID` to the numeric MiguelNetwork
       CurseForge project ID.
 - [ ] Confirm the workflow can use the token and version-type catalog to resolve
-      exactly one Minecraft 1.21.1 entry, one NeoForge entry, and the Client and
+      exactly one Minecraft 1.20.1 entry, one Forge entry, and the Client and
       Server environment entries.
 - [ ] Review any environment protection rules and required reviewers.
 

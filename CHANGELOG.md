@@ -2,9 +2,14 @@
 
 ## Unreleased
 
+- Complete the Forge 1.20.1 / Java 17 build, including bounded gateway workers and concurrent transfer/shutdown tests.
+- Register Forge Mixins, generate the SRG refmap, and verify metadata and Java 17 bytecode in the reobfuscated JAR.
+- Restrict Minecraft metadata to 1.20.1 and fix the CurseForge 1.20 version catalog selection.
+- Document Forge prerequisites and preserve maintainer authorship with the Codex co-author trailer.
+
 - Download and verify pinned upstream wstunnel release archives as part of the Gradle build.
 - Verify native binary hashes and required licensing/provenance files inside the final Mod JAR.
-- Pin the Gradle 8.9 distribution SHA-256 used by the checked-in wrapper.
+- Pin the Gradle 8.14.5 distribution SHA-256 used by this branch's checked-in wrapper.
 - Add tag-driven GitHub Release, artifact attestation, checksums, and CurseForge publishing automation.
 - Resolve CurseForge upload metadata within the correct game, loader, and client/server version types.
 

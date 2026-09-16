@@ -1,8 +1,8 @@
 # MiguelNetwork — CurseForge Description / CurseForge 项目介绍
 
 > **Short description / 简短介绍**
-> Carry Minecraft TCP over WebSocket with a bundled Rust wstunnel sidecar and a one-port standalone gateway. Mitigates raw-TCP QoS/blocking; optional proxy-terminated WSS; ZstdNet 1.4.7/1.4.8.
-> 通过内置 Rust wstunnel sidecar 和单端口 standalone 网关承载 Minecraft TCP，缓解原生 TCP QoS/阻断；可选反代 WSS，兼容 ZstdNet 1.4.7/1.4.8。
+> Carry Minecraft TCP over WebSocket with a bundled Rust wstunnel sidecar and a one-port standalone gateway. Mitigates raw-TCP QoS/blocking; optional proxy-terminated WSS; ZstdNet 1.4.8 Forge.
+> 通过内置 Rust wstunnel sidecar 和单端口 standalone 网关承载 Minecraft TCP，缓解原生 TCP QoS/阻断；可选反代 WSS，兼容 ZstdNet 1.4.8 Forge。
 
 ---
 
@@ -10,7 +10,7 @@
 
 ### MiguelNetwork 是什么？
 
-MiguelNetwork 是一个同时运行在 Minecraft Java Edition 客户端和服务端的 NeoForge 网络 Mod。它把原始
+MiguelNetwork 是一个同时运行在 Minecraft Java Edition 客户端和服务端的 Forge 网络 Mod。它把原始
 Minecraft TCP 字节流承载在 WebSocket 上，同时保留玩家熟悉的服务器列表、状态 Ping、登录和游戏流程。
 
 玩家仍然填写普通的服务器域名和端口。Minecraft 的握手地址、登录加密、数据包格式和游戏内容均不改变；
@@ -59,7 +59,7 @@ MiguelNetwork **不强制传输层加密**。默认并推荐的部署方式是 `
   ZstdNet 本地监听器，不开放 SOCKS、HTTP 代理、UDP、任意目标或反向隧道。
 - **兼容普通服务器**：Discovery 不可用时，默认可以按 WSS、WS、原始 TCP 的顺序执行旧版探测，因此安装
   本 Mod 后仍可连接普通 Minecraft 服务器。需要严格 Discovery-only 时可关闭 `legacyFallback`。
-- **ZstdNet 1.4.7/1.4.8 兼容**：适配器会自动发现 ZstdNet 监听端口，并优先路由已经压缩的字节流；不复制、
+- **ZstdNet 1.4.8 Forge 兼容**：适配器会自动发现 ZstdNet 监听端口，并优先路由已经压缩的字节流；不复制、
   修改或重新实现 Zstd 压缩。客户端没有 ZstdNet 时仍可选择原始 Minecraft 路由。
 
 ### 技术路线
@@ -88,7 +88,7 @@ Minecraft 客户端
   -> Minecraft 本地监听器
 ```
 
-启用 ZstdNet 1.4.7 或 1.4.8 时，登录流量为：
+启用 ZstdNet 1.4.8 Forge 时，登录流量为：
 
 ```text
 Minecraft 客户端
@@ -106,14 +106,14 @@ MiguelNetwork 只传输已经压缩的 TCP 字节流。Discovery 会优先发布
 ### 支持环境
 
 - MiguelNetwork 0.2.0 技术预览版
-- Minecraft Java Edition 1.21.1
-- Java 21
-- 编译基线：NeoForge 21.1.77
+- Minecraft Java Edition 1.20.1
+- Java 17
+- 编译基线：Forge 47.1.3
 - Windows x64 客户端/服务端
 - Linux x64 客户端/服务端
 - 同一个 JAR 用于客户端和独立服务端
-- 可选兼容：ZstdNet **1.4.7 和 1.4.8**
-- 安装 ZstdNet 时，其已核实的 JAR 元数据要求 NeoForge **21.1.221 或更高版本**
+- 可选兼容：ZstdNet **1.4.8 Forge 1.20.1 构建**（已核对反射 API）
+- 继承的 1.4.7 版本白名单尚未在 Forge 构建上单独核实；不要安装 NeoForge 版 JAR
 
 macOS、ARM、Bedrock、UDP Mod 流量和 SRV 重定向目前不受支持。0.2.0 仍是技术预览版，正式投入长期运行前
 应在目标整合包和网络环境中验证。
@@ -122,9 +122,9 @@ macOS、ARM、Bedrock、UDP Mod 流量和 SRV 重定向目前不受支持。0.2.
 
 #### 玩家/客户端
 
-1. 安装 Minecraft 1.21.1、Java 21 和合适版本的 NeoForge。
+1. 安装 Minecraft 1.20.1、Java 17 和合适版本的 Forge。
 2. 将 MiguelNetwork JAR 放入客户端 `mods` 目录；无需单独安装 wstunnel，也没有必需的前置 Mod。
-3. 如需 ZstdNet，安装 1.4.7 或 1.4.8，并使用 NeoForge 21.1.221 或更新版本。
+3. 如需 ZstdNet，安装 Forge 1.20.1 版 1.4.8（CurseForge 文件 8752125）。
 4. 正常启动游戏，在服务器列表中填写服主提供的 `域名或IP:publicPort`。
 5. 客户端会自动请求 Discovery、选择兼容路由并启动本地 sidecar。
 
@@ -147,7 +147,7 @@ verifyTlsCertificates = true
 
 #### 服主：方案一，standalone（默认并推荐）
 
-1. 将同一个 MiguelNetwork JAR 放入独立服务端 `mods` 目录。可选安装 ZstdNet 1.4.7/1.4.8。
+1. 将同一个 MiguelNetwork JAR 放入独立服务端 `mods` 目录。可选安装 ZstdNet 1.4.8 Forge。
 2. 让 Minecraft 后端使用私有地址和独立端口，例如：
 
    ```properties
@@ -232,7 +232,9 @@ MiguelNetwork 的私有上游保持 WS。
 
 ### 已验证内容与技术预览限制
 
-核心链路已完成 Windows 客户端到 Linux 服务端的跨主机 WS/WSS 测试，包括状态 Ping、账户认证、进入世界、
+以下是原 NeoForge 1.21.1 分支的历史验证，不代表本分支的 Forge 运行验收。Forge 构建记录见 [FORGE_VALIDATION.md](FORGE_VALIDATION.md)。
+
+原分支核心链路已完成 Windows 客户端到 Linux 服务端的跨主机 WS/WSS 测试，包括状态 Ping、账户认证、进入世界、
 约 37 分钟实机游戏和连续 50 次公网状态连接。standalone 网关已在 ATM10 环境中通过真实日志验证：公网网关、
 回环 wstunnel、ZstdNet 1.4.7 和 Minecraft 后端均按预期组成，Discovery 分别选择了原始状态路由和 ZstdNet
 登录路由。ZstdNet 1.4.8 的相同 API 兼容性已经核实，并已纳入精确版本门控和单元测试。
@@ -244,7 +246,7 @@ MiguelNetwork 的私有上游保持 WS。
 - 首次访问 Discovery 不可用的未知服务器时，兼容探测可能带来额外等待。
 - WS/WSS 包装有少量额外开销；严重丢包线路仍可能出现抖动。
 
-问题反馈请附 Minecraft、NeoForge、MiguelNetwork、操作系统和（如有）ZstdNet 的准确版本，以及已脱敏日志。
+问题反馈请附 Minecraft、Forge、MiguelNetwork、操作系统和（如有）ZstdNet 的准确版本，以及已脱敏日志。
 请勿公开 Discovery 私钥、TLS 私钥、令牌或完整敏感配置。
 
 ### 许可证与第三方组件
@@ -258,7 +260,7 @@ MiguelNetwork 使用 Apache-2.0 许可证。随包分发的 wstunnel 使用 BSD-
 
 ### What is MiguelNetwork?
 
-MiguelNetwork is a client-and-server networking mod for Minecraft Java Edition on NeoForge. It carries the original
+MiguelNetwork is a client-and-server networking mod for Minecraft Java Edition on Forge. It carries the original
 Minecraft TCP byte stream over WebSocket while preserving the normal server list, status ping, login, and gameplay.
 
 Players still enter an ordinary hostname and port. Minecraft's logical handshake address, login encryption, packet
@@ -308,7 +310,7 @@ does not obtain, manage, or require certificates.
   supported ZstdNet listeners—never SOCKS, an HTTP proxy, UDP, arbitrary targets, or reverse tunnels.
 - **Ordinary-server compatibility:** When Discovery is unavailable, the default legacy path may probe WSS, WS, then raw
   TCP. Set `legacyFallback = false` for strict Discovery-only behavior.
-- **ZstdNet 1.4.7/1.4.8 compatibility:** MiguelNetwork auto-detects the ZstdNet listener and carries its already-compressed
+- **ZstdNet 1.4.8 Forge compatibility:** MiguelNetwork auto-detects the ZstdNet listener and carries its already-compressed
   stream without copying or modifying the Zstd implementation. A raw Minecraft route remains available.
 
 ### Technical architecture
@@ -337,7 +339,7 @@ Minecraft client
   -> private Minecraft listener
 ```
 
-With ZstdNet 1.4.7 or 1.4.8, login traffic becomes:
+With ZstdNet 1.4.8 for Forge, login traffic becomes:
 
 ```text
 Minecraft client
@@ -355,14 +357,14 @@ publishes a raw Minecraft route.
 ### Supported environment
 
 - MiguelNetwork 0.2.0 technical preview
-- Minecraft Java Edition 1.21.1
-- Java 21
-- Compile baseline: NeoForge 21.1.77
+- Minecraft Java Edition 1.20.1
+- Java 17
+- Compile baseline: Forge 47.1.3
 - Windows x64 client/server
 - Linux x64 client/server
 - The same JAR is used on the client and dedicated server
-- Optional compatibility: ZstdNet **1.4.7 and 1.4.8**
-- With ZstdNet installed, its verified JAR metadata requires NeoForge **21.1.221 or newer**
+- Optional compatibility: ZstdNet **1.4.8 for Forge 1.20.1** (reflective API checked)
+- The inherited 1.4.7 allowlist entry has not been independently verified on Forge; do not install a NeoForge JAR
 
 macOS, ARM, Bedrock, UDP mod traffic, and SRV redirects are not supported. Validate this technical preview against the
 target modpack and network before long-term production use.
@@ -371,9 +373,9 @@ target modpack and network before long-term production use.
 
 #### Players / clients
 
-1. Install Minecraft 1.21.1, Java 21, and a suitable NeoForge version.
+1. Install Minecraft 1.20.1, Java 17, and a suitable Forge version.
 2. Put the MiguelNetwork JAR in the client's `mods` directory. No separate wstunnel installation is needed.
-3. To use ZstdNet, install 1.4.7 or 1.4.8 and use NeoForge 21.1.221 or newer.
+3. To use ZstdNet, install version 1.4.8 for Forge 1.20.1 (CurseForge file 8752125).
 4. Enter the server owner's `hostname-or-IP:publicPort` in the normal server list.
 5. MiguelNetwork automatically requests Discovery, selects a route, and starts its local sidecar.
 
@@ -396,7 +398,7 @@ MiguelNetwork WS/WSS endpoint.
 
 #### Server owners: option 1, standalone (default and recommended)
 
-1. Put the same MiguelNetwork JAR in the dedicated server's `mods` directory. ZstdNet 1.4.7/1.4.8 is optional.
+1. Put the same MiguelNetwork JAR in the dedicated server's `mods` directory. ZstdNet 1.4.8 Forge is optional.
 2. Keep Minecraft on a private address and a separate port, for example:
 
    ```properties
@@ -483,7 +485,9 @@ upload or share it.
 
 ### Validation and technical-preview limitations
 
-The core path has been tested from Windows clients to Linux servers over WS/WSS, including status pings, account login,
+The following records historical NeoForge 1.21.1 validation, not Forge runtime acceptance. See [FORGE_VALIDATION.md](FORGE_VALIDATION.md) for this branch.
+
+The original core path has been tested from Windows clients to Linux servers over WS/WSS, including status pings, account login,
 world entry, an approximately 37-minute gameplay session, and 50 sequential public status connections. The standalone
 gateway has also been verified in ATM10 using matching client/server logs: public gateway, loopback wstunnel, ZstdNet
 1.4.7, and the Minecraft backend composed as designed. Discovery selected the raw status route and the ZstdNet login
@@ -496,7 +500,7 @@ Known limitations include:
 - Compatibility probing can add delay when Discovery is unavailable for a previously unknown server.
 - WS/WSS framing adds a small overhead, and a severely lossy underlying route can still cause jitter.
 
-When reporting an issue, include exact Minecraft, NeoForge, MiguelNetwork, operating-system, and—if applicable—ZstdNet
+When reporting an issue, include exact Minecraft, Forge, MiguelNetwork, operating-system, and—if applicable—ZstdNet
 versions plus relevant redacted logs. Never publish private keys, tokens, or complete sensitive configuration.
 
 ### License and third-party software

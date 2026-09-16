@@ -10,7 +10,9 @@ import java.net.InetSocketAddress;
 
 @Mixin(Connection.class)
 public abstract class ConnectionMixin {
-    @ModifyVariable(method = "connect", at = @At("HEAD"), argsOnly = true, ordinal = 0)
+    @ModifyVariable(
+            method = "connect(Ljava/net/InetSocketAddress;ZLnet/minecraft/network/Connection;)Lio/netty/channel/ChannelFuture;",
+            at = @At("HEAD"), argsOnly = true, ordinal = 0)
     private static InetSocketAddress miguelnetwork$redirectConnection(InetSocketAddress original) {
         return ClientTunnelManager.redirect(original);
     }

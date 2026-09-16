@@ -2,15 +2,15 @@
 
 ## Prerequisites
 
-- Java 21 (the Gradle toolchain and NeoForge target are both Java 21).
+- Java 17 (both compilation with `--release 17` and tests use this toolchain).
 - A checkout with the included Gradle wrapper. No system Gradle installation is
   required.
-- Network access on the first build so Gradle can resolve NeoForge and test
+- Network access on the first build so Gradle can resolve Forge and test
   dependencies. The wrapper and dependency caches are intentionally not tracked.
 
-The project targets Minecraft 1.21.1 and compiles against NeoForge 21.1.77. The
-verified ZstdNet 1.4.7/1.4.8 JAR metadata requires NeoForge 21.1.221 or newer, so
-integration runs with ZstdNet must use that higher floor. The bundled wstunnel
+This branch targets exactly Minecraft 1.20.1 and compiles against Forge 47.1.3.
+The optional development dependency is the Forge 1.20.1 build of ZstdNet 1.4.8
+(CurseForge file 8752125), whose reflective API has been checked. The bundled wstunnel
 sidecar is version 10.7.1; its platform binaries and SHA-256 manifest are part of
 the source tree and should be changed only with a corresponding license/hash audit.
 
@@ -22,11 +22,11 @@ From the repository root:
 .\gradlew.bat --version
 .\gradlew.bat test
 .\gradlew.bat build --no-daemon
-.\gradlew.bat clean test jar
+.\gradlew.bat clean build
 ```
 
 Use `./gradlew` on Linux/macOS. `build` runs the JUnit suite and produces the Mod
-JAR under `build/libs/`. The `clean test jar` command is useful before a release,
+reobfuscated JAR under `build/libs/`. The `clean build` command is useful before a release,
 but removes only ignored build output; it does not touch source or runtime data.
 
 Useful local checks:
@@ -34,11 +34,20 @@ Useful local checks:
 ```text
 git diff --check
 git status --short --branch
-jar tf build/libs/miguelnetwork-neoforge-1.21.1-0.2.0.jar | Select-String 'neoforge.mods.toml|wstunnel-manifest|native/'
+jar tf build/libs/miguelnetwork-forge-1.20.1-0.2.0.jar | Select-String 'mods.toml|refmap|wstunnel-manifest|native/'
 ```
 
 The final `jar` inspection is illustrative for PowerShell; on POSIX systems use
-`jar tf ... | grep -E 'neoforge.mods.toml|wstunnel-manifest|native/'`.
+`jar tf ... | grep -E 'mods.toml|refmap|wstunnel-manifest|native/'`.
+
+`verifyDistribution` inspects the final `reobfJar` output, including its
+`MixinConfigs` manifest, the ConnectionMixin SRG refmap, Java 17 class versions,
+and exact Minecraft metadata. Do not ship the development JAR in `build/devlibs/`.
+
+The Java 17 standalone gateway admits at most 128 simultaneous connections.
+Each can use a worker for each direction; a cached daemon pool avoids blocking
+reverse traffic behind long-lived forward readers. Excess connections are closed.
+Loopback tests cover concurrent bidirectional traffic, half-close, and shutdown.
 
 ## Test coverage map
 

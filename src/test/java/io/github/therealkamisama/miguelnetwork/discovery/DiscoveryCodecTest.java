@@ -26,8 +26,8 @@ class DiscoveryCodecTest {
 
         assertEquals(manifest, decoded.manifest());
         assertArrayEquals(pair.getPublic().getEncoded(), decoded.publicKey().getEncoded());
-        assertEquals("192.168.0.146", decoded.manifest().routes().getFirst().wstunnelTargetHost());
-        assertEquals(25573, decoded.manifest().routes().getFirst().wstunnelTargetPort());
+        assertEquals("192.168.0.146", decoded.manifest().routes().get(0).wstunnelTargetHost());
+        assertEquals(25573, decoded.manifest().routes().get(0).wstunnelTargetPort());
     }
 
     @Test

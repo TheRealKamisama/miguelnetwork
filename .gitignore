@@ -24,3 +24,8 @@ runs
 run-data
 
 repo
+
+*.log
+.agents/
+.codex/
+src/main/resources/native/
