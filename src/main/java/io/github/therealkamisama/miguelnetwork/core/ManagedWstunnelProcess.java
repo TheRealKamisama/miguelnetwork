@@ -1,6 +1,6 @@
 package io.github.therealkamisama.miguelnetwork.core;
 
-import org.slf4j.Logger;
+import org.apache.logging.log4j.Logger;
 
 import java.io.BufferedReader;
 import java.io.IOException;

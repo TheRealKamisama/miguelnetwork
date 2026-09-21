@@ -1,59 +1,59 @@
 package io.github.therealkamisama.miguelnetwork;
 
-import com.mojang.logging.LogUtils;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.server.ServerTunnelController;
-import net.neoforged.bus.api.IEventBus;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.ModContainer;
-import net.neoforged.fml.common.Mod;
-import net.neoforged.fml.config.ModConfig;
-import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.GameShuttingDownEvent;
-import net.neoforged.neoforge.event.server.ServerStartedEvent;
-import net.neoforged.neoforge.event.server.ServerStoppingEvent;
-import org.slf4j.Logger;
+import net.minecraftforge.fml.common.FMLCommonHandler;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.fml.common.event.FMLPreInitializationEvent;
+import net.minecraftforge.fml.common.event.FMLServerStartedEvent;
+import net.minecraftforge.fml.common.event.FMLServerStoppingEvent;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
-@Mod(MiguelNetwork.MOD_ID)
+import java.nio.file.Path;
+
+@Mod(modid = MiguelNetwork.MOD_ID, name = "MiguelNetwork", version = BuildInfo.VERSION,
+        acceptedMinecraftVersions = "[1.12.2]", acceptableRemoteVersions = "*",
+        dependencies = "required-after:cleanroom@[" + BuildInfo.CLEANROOM_VERSION + "]")
 public final class MiguelNetwork {
     public static final String MOD_ID = "miguelnetwork";
-    public static final Logger LOGGER = LogUtils.getLogger();
+    public static final Logger LOGGER = LogManager.getLogger(MOD_ID);
+    private static Path gameDirectory;
 
-    public MiguelNetwork(IEventBus modEventBus, ModContainer modContainer) {
-        modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "miguelnetwork-client.toml");
-        // COMMON configs are materialized in config/. NeoForge SERVER configs live under a world's serverconfig
-        // directory, which made the documented dedicated-server file appear to be missing.
-        modContainer.registerConfig(ModConfig.Type.COMMON, ServerConfig.SPEC, "miguelnetwork-server.toml");
-        NeoForge.EVENT_BUS.register(this);
+    @Mod.EventHandler
+    public void preInit(FMLPreInitializationEvent event) {
+        Path config = event.getModConfigurationDirectory().toPath().toAbsolutePath();
+        gameDirectory = config.getParent();
+        ServerConfig.SPEC.load(config.resolve("miguelnetwork-server.toml"));
+        if (event.getSide().isClient()) {
+            ClientConfig.SPEC.load(config.resolve("miguelnetwork-client.toml"));
+            ClientTunnelManager.initialize(gameDirectory);
+        }
         Runtime.getRuntime().addShutdownHook(new Thread(MiguelNetwork::stopSidecars, "MiguelNetwork-shutdown"));
         LOGGER.info("MiguelNetwork loaded");
     }
 
-    @SubscribeEvent
-    public void onServerStarted(ServerStartedEvent event) {
-        if (event.getServer().isDedicatedServer()) {
-            ServerTunnelController.start(event.getServer());
-        }
+    public static Path gameDirectory() {
+        if (gameDirectory == null) throw new IllegalStateException("MiguelNetwork has not initialized");
+        return gameDirectory;
     }
 
-    @SubscribeEvent
-    public void onServerStopping(ServerStoppingEvent event) {
+    @Mod.EventHandler
+    public void serverStarted(FMLServerStartedEvent event) {
+        var server = FMLCommonHandler.instance().getMinecraftServerInstance();
+        if (server.isDedicatedServer()) ServerTunnelController.start(gameDirectory(), server.getServerPort());
+    }
+
+    @Mod.EventHandler
+    public void serverStopping(FMLServerStoppingEvent event) {
         ServerTunnelController.stop();
     }
 
-    @SubscribeEvent
-    public void onGameShuttingDown(GameShuttingDownEvent event) {
-        stopSidecars();
-    }
-
-    private static void stopSidecars() {
-        if (FMLEnvironment.dist == Dist.CLIENT) {
-            ClientTunnelManager.stop();
-        }
+    public static void stopSidecars() {
+        // ClientTunnelManager uses only JDK/config classes; no client-only Minecraft classes are loaded here.
+        ClientTunnelManager.stop();
         ServerTunnelController.stop();
     }
 }

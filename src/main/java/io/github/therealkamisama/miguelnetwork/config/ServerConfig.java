@@ -2,30 +2,29 @@ package io.github.therealkamisama.miguelnetwork.config;
 
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
-import net.neoforged.neoforge.common.ModConfigSpec;
 
 public final class ServerConfig {
-    public static final ModConfigSpec SPEC;
-    private static final ModConfigSpec.BooleanValue ENABLED;
-    private static final ModConfigSpec.EnumValue<DeploymentMode> MODE;
-    private static final ModConfigSpec.ConfigValue<String> BIND_HOST;
-    private static final ModConfigSpec.IntValue PUBLIC_PORT;
-    private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ModConfigSpec.BooleanValue DISCOVERY_ENABLED;
-    private static final ModConfigSpec.BooleanValue SIGN_DISCOVERY;
-    private static final ModConfigSpec.ConfigValue<String> DISCOVERY_BIND_HOST;
-    private static final ModConfigSpec.IntValue DISCOVERY_PORT;
-    private static final ModConfigSpec.EnumValue<TransportProtocol> ADVERTISED_TRANSPORT;
-    private static final ModConfigSpec.ConfigValue<String> ADVERTISED_HOST;
-    private static final ModConfigSpec.IntValue ADVERTISED_PORT;
-    private static final ModConfigSpec.LongValue DISCOVERY_CONFIG_EPOCH;
-    private static final ModConfigSpec.IntValue DISCOVERY_VALIDITY_SECONDS;
+    public static final SettingsSpec SPEC;
+    private static final SettingsSpec.BooleanValue ENABLED;
+    private static final SettingsSpec.EnumValue<DeploymentMode> MODE;
+    private static final SettingsSpec.ConfigValue<String> BIND_HOST;
+    private static final SettingsSpec.IntValue PUBLIC_PORT;
+    private static final SettingsSpec.ConfigValue<String> PATH_PREFIX;
+    private static final SettingsSpec.BooleanValue DISCOVERY_ENABLED;
+    private static final SettingsSpec.BooleanValue SIGN_DISCOVERY;
+    private static final SettingsSpec.ConfigValue<String> DISCOVERY_BIND_HOST;
+    private static final SettingsSpec.IntValue DISCOVERY_PORT;
+    private static final SettingsSpec.EnumValue<TransportProtocol> ADVERTISED_TRANSPORT;
+    private static final SettingsSpec.ConfigValue<String> ADVERTISED_HOST;
+    private static final SettingsSpec.IntValue ADVERTISED_PORT;
+    private static final SettingsSpec.LongValue DISCOVERY_CONFIG_EPOCH;
+    private static final SettingsSpec.IntValue DISCOVERY_VALIDITY_SECONDS;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        SettingsSpec.Builder builder = new SettingsSpec.Builder();
         builder.comment(
                 "MiguelNetwork dedicated-server settings.",
-                "Minecraft target IP/port come from server.properties; the supported ZstdNet listener is auto-detected."
+                "Minecraft target IP/port come from server.properties and the running dedicated server."
         );
         ENABLED = builder.comment("Start MiguelNetwork automatically when the dedicated server is ready.")
                 .define("enabled", true);

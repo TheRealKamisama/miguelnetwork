@@ -2,17 +2,17 @@
 
 ## Project contract
 
-- MiguelNetwork is a Java 21 NeoForge mod for Minecraft 1.21.1. It bundles the pinned
+- This branch ports MiguelNetwork to Java 25 / Cleanroom 0.6.13-alpha / Minecraft 1.12.2. It bundles the pinned
   `wstunnel` 10.7.1 binaries for Windows x86-64 and Linux x86-64.
 - `STANDALONE` is the default server mode: the built-in gateway serves Discovery and
   forwards WebSocket traffic on `server.publicPort`. `EXTERNAL_PROXY` is for Nginx or
   another gateway that owns the public endpoint.
 - Discovery v1 is the normal client control path. The client may use its legacy
   WSS/WS/TCP probe only when Discovery is unavailable and `legacyFallback` is enabled.
-  ZstdNet compatibility is intentionally version-gated to 1.4.7 and 1.4.8.
-- MiguelNetwork itself is compiled against NeoForge 21.1.77. The verified ZstdNet
-  1.4.7/1.4.8 JAR metadata requires NeoForge 21.1.221 or newer, so use that higher
-  floor whenever ZstdNet is installed.
+  This platform has no ZstdNet compatibility adapter or compression-filter support.
+- Use the pinned Unimined 1.4.36-kappa and Gradle 9.7.0 wrapper. Build and run on Java 25.
+  MCP's legacy merge tool additionally requires a JDK 8 build helper; see docs/DEVELOPMENT.md.
+  Do not declare ordinary Forge/Java 8 support. Preserve unknown-required-filter rejection.
 
 ## Transport and encryption principle
 
@@ -51,25 +51,26 @@ Use the checked-in Gradle wrapper so the Gradle version is reproducible:
 ```text
 .\gradlew.bat test                 # unit tests
 .\gradlew.bat build --no-daemon   # tests plus the distributable JAR
-.\gradlew.bat clean test jar      # release-preparation build
+.\gradlew.bat clean build         # release-preparation build (remapped production JAR)
 ```
 
 On a POSIX shell, use `./gradlew` instead. If dependency resolution fails, record
-the first network/repository error and retry only after checking Java 21,
+the first network/repository error and retry only after checking Java 25,
 `gradle/wrapper/gradle-wrapper.properties`, and the local Gradle cache. Do not
 replace the wrapper with an unpinned system Gradle.
 
 Before hand-off, run `git diff --check`, inspect `git diff`, and record the exact
 artifact path and SHA-256. A successful build produces
-`build/libs/miguelnetwork-neoforge-1.21.1-<mod_version>.jar`.
+`build/libs/miguelnetwork-cleanroom-1.12.2-<mod_version>.jar`.
+The `dev` and `shadow-dev` JARs are not distributable; verify `remapShadowJar` output.
 
 ## Code and documentation rules
 
 - The source of truth for the mod version is `mod_version` in `gradle.properties`.
   When bumping it, update current-version references in README/docs/CHANGELOG and
   regenerate metadata through a build. Keep historical changelog entries intact.
-- Keep Discovery and transport behavior fail-closed: required unknown filters,
-  invalid manifests, or unsupported ZstdNet APIs must not silently connect to an
+- Keep Discovery and transport behavior fail-closed: required unknown filters or
+  invalid manifests must not silently connect to an
   unadvertised target.
 - Keep docs aligned with `ServerConfig`, `ClientConfig`, and the actual logger
   messages. Use the exact config key and log text when documenting diagnostics.

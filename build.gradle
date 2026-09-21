@@ -1,5 +1,4 @@
 import groovy.json.JsonSlurper
-
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
@@ -7,83 +6,80 @@ import java.util.zip.ZipFile
 
 plugins {
     id 'java-library'
-    id 'net.neoforged.moddev' version '1.0.21'
+    id 'com.gradleup.shadow' version '9.5.1'
+    id 'xyz.wagyourtail.unimined' version '1.4.36-kappa'
 }
-
 version = mod_version
 group = mod_group_id
+base { archivesName = "${mod_id}-cleanroom-${minecraft_version}" }
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version as int)
 
-base {
-    archivesName = "${mod_id}-neoforge-${minecraft_version}"
+configurations {
+    bundled
+    bundledSources
+    implementation.extendsFrom(bundled)
 }
-
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-neoForge {
-    version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
-
-    runs {
-        client {
-            client()
-            gameDirectory = file('run/client')
-        }
-
-        server {
-            server()
-            gameDirectory = file('run/server')
-            programArgument '--nogui'
-        }
-
-        configureEach {
-            logLevel = org.slf4j.event.Level.INFO
-        }
-    }
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
-    }
-}
-
+repositories { mavenCentral() }
 dependencies {
+    bundled('com.electronwill.night-config:core:3.6.4') { transitive = false }
+    bundled('com.electronwill.night-config:toml:3.6.4') { transitive = false }
+    bundledSources('com.electronwill.night-config:core:3.6.4:sources') { transitive = false }
+    bundledSources('com.electronwill.night-config:toml:3.6.4:sources') { transitive = false }
     testImplementation platform('org.junit:junit-bom:5.11.0')
     testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'com.google.code.gson:gson:2.10.1'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    // Unimined's game libraries are not inherited by the plain JUnit runtime.
+    // Match Cleanroom 0.6.13-alpha's installer; the game supplies these (do not shade them).
+    testRuntimeOnly 'com.google.code.gson:gson:2.14.0'
+    testRuntimeOnly 'org.apache.logging.log4j:log4j-api:2.26.0'
+    testRuntimeOnly 'org.apache.logging.log4j:log4j-core:2.26.0'
 }
+tasks.named('test', Test) { useJUnitPlatform() }
 
-tasks.named('test', Test).configure {
-    useJUnitPlatform()
+unimined.minecraft {
+    version project.minecraft_version
+    mappings { mcp('stable', '39-1.12') }
+    cleanroom {
+        loader project.cleanroom_version
+        runs.all {
+            systemProperty('crl.dev.mixin', 'miguelnetwork.mixins.json')
+        }
+    }
+    defaultRemapJar = false
+    remap(tasks.named('shadowJar').get()) {
+        mixinRemap { enableBaseMixin() }
+    }
 }
+tasks.named('jar', Jar) {
+    archiveClassifier = 'dev'
+    manifest.attributes('ModType': 'CRL', 'MixinConfigs': 'miguelnetwork.mixins.json')
+}
+tasks.named('shadowJar') {
+    configurations = [project.configurations.bundled]
+    archiveClassifier = 'shadow-dev'
+    relocate 'com.electronwill.nightconfig', 'io.github.therealkamisama.miguelnetwork.internal.nightconfig'
+}
+tasks.named('remapShadowJar') { archiveClassifier = '' }
+tasks.named('assemble') { dependsOn tasks.named('remapShadowJar') }
 
+def metadataProperties = ['minecraft_version', 'cleanroom_version', 'mod_id', 'mod_name',
+                          'mod_license', 'mod_version', 'mod_authors', 'mod_description']
+        .collectEntries { [(it): project.property(it)] }
 def generateModMetadata = tasks.register('generateModMetadata', ProcessResources) {
-    def replaceProperties = [
-            minecraft_version       : minecraft_version,
-            minecraft_version_range : minecraft_version_range,
-            neo_version             : neo_version,
-            neo_version_range       : neo_version_range,
-            loader_version_range    : loader_version_range,
-            mod_id                  : mod_id,
-            mod_name                : mod_name,
-            mod_license             : mod_license,
-            mod_version             : mod_version,
-            mod_authors             : mod_authors,
-            mod_description         : mod_description
-    ]
-    inputs.properties replaceProperties
-    expand replaceProperties
+    inputs.properties metadataProperties
+    expand metadataProperties
     from 'src/main/templates'
-    into 'build/generated/sources/modMetadata'
+    into layout.buildDirectory.dir('generated/modMetadata')
 }
-
+def generateBuildInfo = tasks.register('generateBuildInfo', Copy) {
+    inputs.properties metadataProperties
+    expand metadataProperties
+    from 'src/main/java-templates'
+    into layout.buildDirectory.dir('generated/buildInfo')
+}
 sourceSets.main.resources.srcDir generateModMetadata
+sourceSets.main.java.srcDir generateBuildInfo
 sourceSets.main.resources.exclude 'native/**'
-neoForge.ideSyncTask generateModMetadata
 
 def wstunnelManifestFile = file('src/main/resources/META-INF/miguelnetwork/wstunnel-manifest.json')
 def wstunnelManifest = new JsonSlurper().parse(wstunnelManifestFile)
@@ -186,6 +182,10 @@ tasks.named('processResources', ProcessResources).configure {
 
     from(wstunnelOutputDirectory)
 
+    from(configurations.bundledSources) {
+        into 'META-INF/sources/nightconfig'
+    }
+
     from('LICENSE') {
         into 'META-INF'
         rename { 'LICENSE-MiguelNetwork-Apache-2.0.txt' }
@@ -199,11 +199,67 @@ tasks.named('processResources', ProcessResources).configure {
 def verifyDistribution = tasks.register('verifyDistribution') {
     group = 'verification'
     description = 'Verifies native binaries and required notices in the distributable Mod JAR.'
-    dependsOn tasks.named('jar')
+    dependsOn tasks.named('remapShadowJar')
 
     doLast {
-        File jarFile = tasks.named('jar').get().archiveFile.get().asFile
+        File jarFile = tasks.named('remapShadowJar').get().archiveFile.get().asFile
         new ZipFile(jarFile).withCloseable { ZipFile zip ->
+            def readText = { String name ->
+                def entry = zip.getEntry(name)
+                if (entry == null) throw new GradleException("Distribution is missing ${name}")
+                zip.getInputStream(entry).withCloseable { it.getText('UTF-8') }
+            }
+            def modMetadata = new JsonSlurper().parseText(readText('mcmod.info'))
+            if (modMetadata.size() != 1 || modMetadata[0].modid != mod_id || modMetadata[0].mcversion != minecraft_version
+                    || modMetadata[0].version != project.version.toString()) {
+                throw new GradleException('Incorrect Cleanroom mod metadata')
+            }
+            def manifest = zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')).withCloseable {
+                new java.util.jar.Manifest(it)
+            }
+            if (manifest.mainAttributes.getValue('ModType') != 'CRL'
+                    || manifest.mainAttributes.getValue('MixinConfigs') != 'miguelnetwork.mixins.json') {
+                throw new GradleException('Missing Cleanroom/Mixin manifest registration')
+            }
+            def mixin = new JsonSlurper().parseText(readText('miguelnetwork.mixins.json'))
+            if (mixin.compatibilityLevel != 'JAVA_25'
+                    || mixin.client != ['NetworkManagerMixin', 'MinecraftShutdownMixin']
+                    || mixin.mixins || mixin.server) {
+                throw new GradleException('Unexpected Mixin configuration or client/server isolation')
+            }
+            if (zip.getEntry('io/github/therealkamisama/miguelnetwork/internal/nightconfig/toml/TomlParser.class') == null) {
+                throw new GradleException('Distribution is missing its isolated TOML parser')
+            }
+            zip.entries().each { entry ->
+                if (entry.name == 'META-INF/neoforge.mods.toml' || entry.name == 'META-INF/mods.toml'
+                        || entry.name.startsWith('com/electronwill/nightconfig/')
+                        || entry.name.contains('ZstdNet') || entry.name.startsWith('net/neoforged/')) {
+                    throw new GradleException("Unexpected platform/dependency entry ${entry.name}")
+                }
+                if (entry.name.endsWith('.class')) {
+                    zip.getInputStream(entry).withCloseable { input ->
+                        def data = new DataInputStream(input)
+                        if (data.readInt() != (int) 0xCAFEBABE) throw new GradleException("Invalid class ${entry.name}")
+                        data.readUnsignedShort()
+                        int major = data.readUnsignedShort()
+                        if (major > 69 || (entry.name.startsWith('io/github/therealkamisama/miguelnetwork/')
+                                && !entry.name.contains('/internal/') && major != 69)) {
+                            throw new GradleException("Unexpected Java class version ${major} in ${entry.name}")
+                        }
+                    }
+                }
+            }
+            // Unimined may emit a refmap or remap selectors directly; inspect the production result in either case.
+            String selectors = ''
+            ['NetworkManagerMixin', 'MinecraftShutdownMixin'].each { name ->
+                def entry = zip.getEntry("io/github/therealkamisama/miguelnetwork/mixin/${name}.class")
+                if (entry == null) throw new GradleException("Missing ${name}")
+                selectors += zip.getInputStream(entry).withCloseable { new String(it.readAllBytes(), 'ISO-8859-1') }
+            }
+            if (mixin.refmap) selectors += readText(mixin.refmap as String)
+            ['func_181124_a', 'func_71405_e'].each { method ->
+                if (!selectors.contains(method)) throw new GradleException("Missing production Mixin mapping ${method}")
+            }
             wstunnelManifest.platforms.each { String platformName, Map metadata ->
                 String executableName = platformName.startsWith('windows-') ? 'wstunnel.exe' : 'wstunnel'
                 String entryName = "native/${platformName}/${executableName}"
@@ -222,6 +278,10 @@ def verifyDistribution = tasks.register('verifyDistribution') {
                     'META-INF/LICENSE-MiguelNetwork-Apache-2.0.txt',
                     'META-INF/NOTICE-MiguelNetwork.txt',
                     'META-INF/licenses/wstunnel-BSD-3-Clause.txt',
+                    'META-INF/licenses/NightConfig-LGPL-3.0.txt',
+                    'META-INF/licenses/NightConfig-GPL-3.0.txt',
+                    'META-INF/sources/nightconfig/core-3.6.4-sources.jar',
+                    'META-INF/sources/nightconfig/toml-3.6.4-sources.jar',
                     'THIRD_PARTY_NOTICES.md',
                     'META-INF/miguelnetwork/wstunnel-manifest.json'
             ].each { String entryName ->

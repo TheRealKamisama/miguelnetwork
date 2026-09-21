@@ -48,7 +48,7 @@ final class ClientDiscoveryService {
             throw new IOException("Discovery endpoint returned HTTP " + response.statusCode());
         }
         if (response.body().length > DiscoveryCodec.MAX_DOCUMENT_BYTES) {
-            throw new IOException("Discovery document is oversized");
+            throw new GeneralSecurityException("Discovery document is oversized");
         }
         SignedDiscoveryDocument signed = verifySignatures
                 ? DiscoveryCodec.decodeAndVerify(response.body()) : null;

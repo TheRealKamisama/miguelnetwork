@@ -1,84 +1,42 @@
-# Development guide
+# Cleanroom development
 
-## Prerequisites
+Target: Minecraft 1.12.2, Cleanroom 0.6.13-alpha, Java 25. Build using the checked-in Gradle 9.7.0 wrapper and
+Unimined 1.4.36-kappa, MCP stable 39-1.12. `mod_version` in `gradle.properties` is the version source of truth.
 
-- Java 21 (the Gradle toolchain and NeoForge target are both Java 21).
-- A checkout with the included Gradle wrapper. No system Gradle installation is
-  required.
-- Network access on the first build so Gradle can resolve NeoForge and test
-  dependencies. The wrapper and dependency caches are intentionally not tracked.
-
-The project targets Minecraft 1.21.1 and compiles against NeoForge 21.1.77. The
-verified ZstdNet 1.4.7/1.4.8 JAR metadata requires NeoForge 21.1.221 or newer, so
-integration runs with ZstdNet must use that higher floor. The bundled wstunnel
-sidecar is version 10.7.1; its platform binaries and SHA-256 manifest are part of
-the source tree and should be changed only with a corresponding license/hash audit.
-
-## Reproducible local commands
-
-From the repository root:
+Keep `JAVA_HOME` on JDK 25. The historical MCP merge step also requires a JDK 8 build helper;
+this does not change the Mod's Java 25 compile target or game runtime. The Foojay settings plugin can provision
+the helper automatically. For offline/local provisioning, set `JAVA8_HOME` to an installed x64 JDK 8 and pass
+`-Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME` to the wrapper. Both JDKs must be available to CI.
 
 ```text
 .\gradlew.bat --version
 .\gradlew.bat test
 .\gradlew.bat build --no-daemon
-.\gradlew.bat clean test jar
+.\gradlew.bat runClient
+.\gradlew.bat runServer
 ```
 
-Use `./gradlew` on Linux/macOS. `build` runs the JUnit suite and produces the Mod
-JAR under `build/libs/`. The `clean test jar` command is useful before a release,
-but removes only ignored build output; it does not touch source or runtime data.
+Use `./gradlew` on Linux. Game runs need a complete Cleanroom installation and any upstream-required components.
+Normal server EULA acceptance remains an operator action. Do not change an existing world's files for testing.
 
-Useful local checks:
+`build` must produce and verify the `remapShadowJar` artifact, not a development JAR.
+It contains `mcmod.info`, `ModType: CRL`, `MixinConfigs`, client-only JAVA_25 Mixin configuration,
+the shaded NightConfig parser and both pinned native binaries with their legal/provenance files.
+The default CleanMix phase registers Minecraft mixins; there is no ZstdNet hook or unnecessary coremod transformer.
 
-```text
-git diff --check
-git status --short --branch
-jar tf build/libs/miguelnetwork-neoforge-1.21.1-0.2.0.jar | Select-String 'neoforge.mods.toml|wstunnel-manifest|native/'
-```
+The connection injection targets `NetworkManager.createNetworkManagerAndConnect(InetAddress,int,boolean)` and changes
+the Netty connect argument pair once. Minecraft handshake parameters and the Forge marker remain with the original caller.
+Check transformed production bytecode and a real status/login/reconnect session before declaring runtime compatibility.
 
-The final `jar` inspection is illustrative for PowerShell; on POSIX systems use
-`jar tf ... | grep -E 'neoforge.mods.toml|wstunnel-manifest|native/'`.
+Tests cover base routing/filter rejection, startup-only TOML validation, Discovery, signatures/trust, command construction,
+native extraction, backend resolution and loopback gateway behavior. Optional remote endpoint tests require
+`MIGUELNETWORK_TEST_ENDPOINT`. A skipped optional test must be recorded.
+The standalone integration test starts the real bundled wstunnel on loopback, checks byte forwarding/reuse/restart,
+and stops both sidecars afterward. It uses temporary files and does not start Minecraft or accept its EULA.
 
-## Test coverage map
+Keep default STANDALONE/plain WS behavior. Unknown required filters, invalid manifests, or Discovery unavailability with
+`legacyFallback=false` must not trigger a silent direct connection. Do not add TLS or signature requirements by default.
 
-- `core/`: command construction, endpoint matching, native-binary extraction,
-  and process lifecycle.
-- `discovery/`: request/manifest codecs, route ordering, nonce/audience/validity,
-  and Ed25519 identity handling.
-- `client/`: Discovery/transport probing, trust-store behavior, and tunnel
-  lifecycle.
-- `server/`: runtime endpoint resolution, restriction generation, and the
-  standalone gateway's Discovery/Upgrade split over loopback sockets.
-- `compat/`: the exact ZstdNet version allowlist. Keep tests for both 1.4.7 and
-  1.4.8 and for nearby unsupported versions whenever that gate changes.
-
-## Runtime validation
-
-The automated suite does not prove a remote deployment is healthy. For a local
-standalone run, use the properties documented in
-[`TECHNICAL_VALIDATION.md`](TECHNICAL_VALIDATION.md), then inspect the server and
-client `logs/latest.log` files. The server must report the standalone gateway and
-the client must report a selected Discovery route. A `selected legacy` or
-`discovered vanilla TCP` line means the fallback path was entered; do not call that
-run a Discovery-only validation.
-
-When diagnosing an installed deployment, collect the relevant log excerpt,
-`config/miguelnetwork/generated/detected-server.toml`, the effective TOML settings,
-and the exact Mod JAR checksum. Redact hostnames, credentials, private keys, and
-unrelated player data before sharing them.
-
-## Change and version workflow
-
-1. Read `AGENTS.md`, check the worktree, and keep unrelated user changes intact.
-2. Make the smallest source/doc change that satisfies the issue.
-3. Update tests and docs when behavior or config changes. Keep historical changelog
-   sections unchanged.
-4. Bump `mod_version` in `gradle.properties` only when the task calls for a release;
-   update the current version in README and protocol/compatibility docs.
-5. Run tests, `build --no-daemon`, `git diff --check`, and inspect the generated
-   artifact before handing off.
-
-Never commit generated `build/`, `.gradle/`, `run/`, `*.log`, server config, trust
-stores, or Discovery private keys. Do not commit, tag, push, log in to GitHub, or
-create a release unless the user explicitly authorizes that operation.
+Before handoff: `git diff --check`, inspect the diff, run the wrapper build, inspect the final JAR and record SHA-256.
+Use `clean build` only for release preparation; never delete user/runtime directories. Build state, `.unimined/`, `.gradle/`,
+logs, generated config and trust stores are ignored. Publishing requires explicit authorization.

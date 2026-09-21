@@ -3,17 +3,15 @@
 This guide applies to MiguelNetwork 0.2.0. For the shorter installation and
 runtime-log checklist, see [`USER_GUIDE.md`](USER_GUIDE.md).
 
-MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` through NeoForge.
-The server configuration is a COMMON config so it is created in the documented top-level `config` directory, not under
-a world's `serverconfig` directory.
+MiguelNetwork reads `config/miguelnetwork-server.toml` and, on clients, `config/miguelnetwork-client.toml` at FML pre-init.
+Missing files are created in the top-level `config` directory. Existing TOML is not rewritten; invalid values fail loading.
+Restart to apply changes. No world-specific `serverconfig` is used.
 
 The Mod reads the running Minecraft port and `server-ip` from `server.properties`. A blank/wildcard `server-ip` becomes
-the loopback target `127.0.0.1`; an explicit address is preserved. Supported ZstdNet versions (currently 1.4.7 and
-1.4.8) are detected reflectively and their listen port becomes a higher-priority route. The resolved values are written
-on every start to
+the loopback target `127.0.0.1`; an explicit address is preserved. The resolved values are written on every start to
 `config/miguelnetwork/generated/detected-server.toml`; this generated file is diagnostic and must not be edited.
 
-`publicPort` cannot equal `server-port` or the detected ZstdNet port: the public gateway/wstunnel listener and the
+`publicPort` cannot equal `server-port`: the public gateway/wstunnel listener and the
 Minecraft backend are different listeners and cannot bind the same address and port.
 
 ## Mode 1: standalone (default)
@@ -52,8 +50,8 @@ validitySeconds = 120
 
 Deployment steps:
 
-1. Install NeoForge, MiguelNetwork and optionally the supported ZstdNet on both client and server.
-2. Keep the Minecraft/ZstdNet backend port private; expose TCP `35548` (or the configured `publicPort`) on the firewall
+1. Install Cleanroom 0.6.13-alpha, Java 25 and MiguelNetwork on both client and server.
+2. Keep the Minecraft backend port private; expose TCP `35548` (or the configured `publicPort`) on the firewall
    and NAT it directly to the Minecraft machine.
 3. Start the server. Confirm the log says `standalone WS gateway is ready` and inspect `detected-server.toml`.
 4. Add `host:35548` to the client server list. No client target port, WS/WSS choice or server allowlist is required.

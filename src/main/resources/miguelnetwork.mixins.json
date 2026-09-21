@@ -1,11 +1,12 @@
 {
   "required": true,
-  "minVersion": "0.8",
+  "minVersion": "0.8.7",
   "package": "io.github.therealkamisama.miguelnetwork.mixin",
-  "compatibilityLevel": "JAVA_21",
+  "compatibilityLevel": "JAVA_25",
+  "target": "@env(DEFAULT)",
   "client": [
-    "ConnectionMixin",
-    "ZstdNetConnectScreenHooksMixin"
+    "NetworkManagerMixin",
+    "MinecraftShutdownMixin"
   ],
   "injectors": {
     "defaultRequire": 1

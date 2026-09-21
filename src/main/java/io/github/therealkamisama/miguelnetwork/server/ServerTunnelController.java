@@ -1,7 +1,6 @@
 package io.github.therealkamisama.miguelnetwork.server;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
-import io.github.therealkamisama.miguelnetwork.compat.ZstdNetServerCompatibility;
 import io.github.therealkamisama.miguelnetwork.config.DeploymentMode;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
@@ -9,8 +8,6 @@ import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
-import net.minecraft.server.MinecraftServer;
-import net.neoforged.fml.loading.FMLPaths;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -21,7 +18,6 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.OptionalInt;
 
 public final class ServerTunnelController {
     private static ManagedWstunnelProcess process;
@@ -31,24 +27,19 @@ public final class ServerTunnelController {
     private ServerTunnelController() {
     }
 
-    public static synchronized void start(MinecraftServer server) {
+    public static synchronized void start(Path gameDirectory, int minecraftPort) {
         if (!ServerConfig.enabled()) {
             MiguelNetwork.LOGGER.info("MiguelNetwork server tunnel is disabled");
             return;
         }
         stop();
         try {
-            Path gameDirectory = FMLPaths.GAMEDIR.get();
-            OptionalInt detectedZstdPort = ZstdNetServerCompatibility.discoverListenPort();
             ServerEndpointResolver.ResolvedEndpoints endpoints = ServerEndpointResolver.resolve(
-                    gameDirectory, server.getPort(), detectedZstdPort);
+                    gameDirectory, minecraftPort);
             validatePorts(endpoints);
 
             List<Integer> allowedTargetPorts = new ArrayList<>();
             allowedTargetPorts.add(endpoints.minecraftPort());
-            if (endpoints.zstdNetPort() != null && endpoints.zstdNetPort() != endpoints.minecraftPort()) {
-                allowedTargetPorts.add(endpoints.zstdNetPort());
-            }
             Path executable = NativeWstunnel.resolve(gameDirectory);
             Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
             Files.createDirectories(generated.getParent());
@@ -122,18 +113,13 @@ public final class ServerTunnelController {
     private static void logDetectedEndpoints(ServerEndpointResolver.ResolvedEndpoints endpoints) {
         MiguelNetwork.LOGGER.info("MiguelNetwork detected Minecraft target {}:{} from server.properties/runtime",
                 endpoints.targetHost(), endpoints.minecraftPort());
-        if (endpoints.zstdNetPort() != null) {
-            MiguelNetwork.LOGGER.info("MiguelNetwork advertises detected ZstdNet target {}:{}",
-                    endpoints.targetHost(), endpoints.zstdNetPort());
-        }
         MiguelNetwork.LOGGER.info("MiguelNetwork Discovery signatures are {}",
                 ServerConfig.signDiscoveryResponses() ? "enabled" : "disabled");
     }
 
     private static void validatePorts(ServerEndpointResolver.ResolvedEndpoints endpoints) throws IOException {
-        if (ServerConfig.publicPort() == endpoints.minecraftPort()
-                || endpoints.zstdNetPort() != null && ServerConfig.publicPort() == endpoints.zstdNetPort()) {
-            throw new IOException("MiguelNetwork publicPort must differ from the Minecraft and ZstdNet listener ports");
+        if (ServerConfig.publicPort() == endpoints.minecraftPort()) {
+            throw new IOException("MiguelNetwork publicPort must differ from the Minecraft listener port");
         }
         if (ServerConfig.mode() == DeploymentMode.EXTERNAL_PROXY && ServerConfig.discoveryEnabled()
                 && ServerConfig.publicPort() == ServerConfig.discoveryPort()

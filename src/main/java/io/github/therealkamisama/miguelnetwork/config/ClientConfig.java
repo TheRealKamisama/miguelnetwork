@@ -2,26 +2,25 @@ package io.github.therealkamisama.miguelnetwork.config;
 
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
-import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.Locale;
 import java.util.Optional;
 
 public final class ClientConfig {
-    public static final ModConfigSpec SPEC;
-    private static final ModConfigSpec.BooleanValue ENABLED;
-    private static final ModConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ModConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
-    private static final ModConfigSpec.BooleanValue LEGACY_FALLBACK;
-    private static final ModConfigSpec.BooleanValue VERIFY_DISCOVERY_SIGNATURES;
-    private static final ModConfigSpec.BooleanValue ENFORCE_WSS_DOWNGRADE_PROTECTION;
-    private static final ModConfigSpec.BooleanValue VERIFY_TLS_CERTIFICATES;
+    public static final SettingsSpec SPEC;
+    private static final SettingsSpec.BooleanValue ENABLED;
+    private static final SettingsSpec.ConfigValue<String> PATH_PREFIX;
+    private static final SettingsSpec.IntValue MAX_TUNNEL_PROCESSES;
+    private static final SettingsSpec.BooleanValue LEGACY_FALLBACK;
+    private static final SettingsSpec.BooleanValue VERIFY_DISCOVERY_SIGNATURES;
+    private static final SettingsSpec.BooleanValue ENFORCE_WSS_DOWNGRADE_PROTECTION;
+    private static final SettingsSpec.BooleanValue VERIFY_TLS_CERTIFICATES;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
+        SettingsSpec.Builder builder = new SettingsSpec.Builder();
         builder.comment("MiguelNetwork client-side WebSocket transport settings.");
         ENABLED = builder.comment(
-                        "Master client switch. When enabled, endpoints are discovered in WSS, WS, then TCP order.")
+                        "Master client switch. Prefer Discovery routes; legacy fallback probes WSS, WS, then TCP.")
                 .define("enabled", true);
         PATH_PREFIX = builder.comment("HTTP Upgrade path prefix shared with the server configuration.")
                 .define("pathPrefix", MiguelNetworkProtocol.DEFAULT_PATH_PREFIX, ClientConfig::isNonBlankString);

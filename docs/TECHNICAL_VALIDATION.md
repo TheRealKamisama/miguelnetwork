@@ -1,3 +1,6 @@
+> Historical NeoForge 1.21.1 documentation. It is not Cleanroom validation or release guidance.
+> For this branch see [Cleanroom migration](CLEANROOM_MIGRATION.md) and [the current user guide](USER_GUIDE.md).
+
 # Technical validation
 
 This guide describes the 0.2.0 validation workflow. Contributor setup and test

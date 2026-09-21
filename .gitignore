@@ -1,4 +1,5 @@
 .gradle/
+.unimined/
 build/
 run/
 out/

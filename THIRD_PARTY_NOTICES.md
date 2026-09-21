@@ -1,6 +1,20 @@
 # Third-party notices
 
-MiguelNetwork itself is licensed under the Apache License 2.0. The component below retains its own license.
+MiguelNetwork itself is licensed under the Apache License 2.0. The components below retain their own licenses.
+
+## NightConfig 3.6.4
+
+This Cleanroom distribution includes NightConfig core and TOML, licensed under GNU LGPL v3.0.
+Upstream: https://github.com/TheElectronWill/Night-Config; Maven coordinates:
+`com.electronwill.night-config:core:3.6.4` and `com.electronwill.night-config:toml:3.6.4`.
+
+The library bytecode is relocated from `com.electronwill.nightconfig` to
+`io.github.therealkamisama.miguelnetwork.internal.nightconfig` to avoid mod-classpath conflicts.
+The complete LGPL/GPL texts are included under `META-INF/licenses/NightConfig-*.txt`.
+The corresponding upstream source JARs are included under `META-INF/sources/nightconfig/`, retaining their copyright headers.
+The public MiguelNetwork source and Gradle build provide the relocation/relinking recipe; replace the bundled dependency
+with a modified build and run `gradlew build` to recombine it. Reverse engineering for debugging modifications to this
+library is permitted. No extra restriction is imposed on the rights granted by the LGPL.
 
 ## wstunnel
 

@@ -1,0 +1,10 @@
+[{
+  "modid": "${mod_id}",
+  "name": "${mod_name}",
+  "version": "${mod_version}",
+  "mcversion": "${minecraft_version}",
+  "description": "${mod_description}",
+  "authorList": ["${mod_authors}"],
+  "url": "https://github.com/TheRealKamisama/miguelnetwork",
+  "modProperties": {"issueTrackerUrl": "https://github.com/TheRealKamisama/miguelnetwork/issues"}
+}]

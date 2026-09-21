@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased — Cleanroom 1.12.2 migration
+
+- Target Cleanroom 0.6.13-alpha and Java 25 using Unimined and the Gradle 9.7.0 wrapper.
+- Adapt FML lifecycle, TOML configuration and the 1.12.2 NetworkManager connection path.
+- Preserve standalone WS/Discovery and optional external-proxy WSS; remove ZstdNet adapters from this platform.
+- Reject unknown required filters and fail on Discovery unavailability when legacyFallback is disabled.
+- Keep production remapping and distribution verification separate from development JARs.
+
 ## Unreleased
 
 - Download and verify pinned upstream wstunnel release archives as part of the Gradle build.

@@ -74,9 +74,9 @@ class DiscoveryCodecTest {
                 now,
                 now + 120,
                 List.of(new DiscoveryRoute(
-                        "zstdnet-primary", TransportProtocol.WSS, "edge.example.test", 443,
+                        "filtered-route", TransportProtocol.WSS, "edge.example.test", 443,
                         "miguelnetwork-v1", "192.168.0.146", 25573, 200,
-                        List.of(new DiscoveryFilter(MiguelNetworkProtocol.ZSTDNET_FILTER, 1, true))
+                        List.of(new DiscoveryFilter("example:compression", 1, true))
                 )),
                 DiscoveryCodec.keyId(pair.getPublic())
         );

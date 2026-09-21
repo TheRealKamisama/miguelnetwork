@@ -1,3 +1,6 @@
+> Historical NeoForge 1.21.1 documentation. It is not Cleanroom validation or release guidance.
+> For this branch see [Cleanroom migration](CLEANROOM_MIGRATION.md) and [the current user guide](USER_GUIDE.md).
+
 # Phase 0 validation report
 
 > Historical note: this report records alpha.1-alpha.5 validation configurations. Alpha.6 defaults to standalone WS
