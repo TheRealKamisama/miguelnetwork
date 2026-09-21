@@ -1,5 +1,10 @@
 # Development guide
 
+Cross-version work is currently research and design only. See the
+[migration plan and verification gates](CROSS_VERSION_PLAN.md) for Forge 1.20.1,
+the Java 17 shared core, and additional NeoForge targets. The commands and
+prerequisites below describe the existing 1.21.1 implementation.
+
 ## Prerequisites
 
 - Java 21 (the Gradle toolchain and NeoForge target are both Java 21).
