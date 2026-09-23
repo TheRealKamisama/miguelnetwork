@@ -9,7 +9,8 @@
   another gateway that owns the public endpoint.
 - Discovery v1 is the normal client control path. The client may use its legacy
   WSS/WS/TCP probe only when Discovery is unavailable and `legacyFallback` is enabled.
-  This platform has no ZstdNet compatibility adapter or compression-filter support.
+  The optional reflective ZstdNet Cleanroom adapter supports only the verified
+  `1.4.7-cleanroom-alpha.1` API; unknown required filters remain unsupported.
 - Use the pinned Unimined 1.4.36-kappa and Gradle 9.7.0 wrapper. Build and run on Java 25.
   MCP's legacy merge tool additionally requires a JDK 8 build helper; see docs/DEVELOPMENT.md.
   Do not declare ordinary Forge/Java 8 support. Preserve unknown-required-filter rejection.

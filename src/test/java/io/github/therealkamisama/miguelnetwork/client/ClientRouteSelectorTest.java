@@ -26,6 +26,16 @@ class ClientRouteSelectorTest {
     }
 
     @Test
+    void verifiedZstdNetFilterCanSelectTheHigherPriorityRoute() {
+        var zstd = route("zstd", TransportProtocol.WS,
+                List.of(new DiscoveryFilter(MiguelNetworkProtocol.ZSTDNET_FILTER, 1, true)));
+        var plain = route("plain", TransportProtocol.WS, List.of());
+
+        assertEquals(plain, ClientRouteSelector.select(manifest(zstd, plain), false, false).orElseThrow());
+        assertEquals(zstd, ClientRouteSelector.select(manifest(zstd, plain), false, true).orElseThrow());
+    }
+
+    @Test
     void optionalUnknownFilterDoesNotRequireAnAdapter() {
         var optional = route("optional", TransportProtocol.WS,
                 List.of(new DiscoveryFilter("unknown:hint", 1, false)));

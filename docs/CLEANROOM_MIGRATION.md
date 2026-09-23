@@ -26,8 +26,10 @@ It does not use the historical Java 21 / Cleanroom 0.4.4-alpha template.
   once per connection. The caller's Minecraft handshake address and Forge marker are left untouched.
 - Add a client-only Minecraft shutdown Mixin and retain idempotent server/JVM sidecar cleanup.
 - Preserve Java virtual threads, standalone plain WS, Discovery v1, optional signatures and optional proxy-terminated WSS.
-- Remove ZstdNet compatibility classes, Mixin, version tests, internal-loopback composition tracking and server route/port discovery.
-  This platform implements no additional transport filters; unknown required filters reject the route.
+- Add the verified optional ZstdNet Cleanroom `1.4.7-cleanroom-alpha.1` adapter. The server discovers its listener and
+  active dedicated-server auto-takeover backend, then advertises a required `zstdnet-stream` route; the client composes
+  MiguelNetwork underneath ZstdNet through reflection, with internal-loopback tracking to prevent a second tunnel.
+  Unknown required filters still reject the route.
 - Make `legacyFallback=false` reject Discovery unavailability, and classify oversized Discovery documents as invalid data.
 - Shade NightConfig into an internal namespace; do not bundle another copy of Minecraft/Netty/Mixin/ASM.
 - Verify production metadata, Mixin selectors, Java 25 class format, isolated TOML parser, native hashes and notices.
@@ -39,7 +41,7 @@ The wrapper `build --no-daemon` completed successfully on Windows x86-64 / Java 
 The final build selected the local Java 8 helper with `-Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME`
 and used checksum-verified local wstunnel archives through `-PwstunnelArchiveDir`.
 
-- 40 tests discovered: 39 passed, 0 failed, 1 skipped. The skipped remote endpoint probe requires
+- 48 tests discovered: 47 passed, 0 failed, 1 skipped. The skipped remote endpoint probe requires
   `MIGUELNETWORK_TEST_ENDPOINT`; no public endpoint was supplied.
 - The real bundled Windows wstunnel integration test passed unsigned Discovery with `legacyFallback=false`,
   128 KiB arbitrary-byte echo through the standalone WS gateway, sidecar reuse, two start/stop cycles,
@@ -54,9 +56,9 @@ and used checksum-verified local wstunnel archives through `-PwstunnelArchiveDir
 - `git diff --check` passed. Gradle reports deprecated plugin/build API usage for a future Gradle 10 upgrade;
   the pinned Gradle 9.7.0 build succeeds.
 
-Artifact: `build/libs/miguelnetwork-cleanroom-1.12.2-0.2.0.jar` (10,414,492 bytes).
+Artifact: `build/libs/miguelnetwork-cleanroom-1.12.2-0.2.0.jar` (10,430,332 bytes).
 
-SHA-256: `cfb4d85c697c9b33d980d828fb16970f5babc7c7c212a146ad5cd2e205b6e38f`.
+SHA-256: `75d84fab586f3be7237629a97181757e4a2e1f5d31d94af253361faac038df3b`.
 
 Initial validation exposed a missing MCP Java 8 helper, missing Gson in the plain JUnit runtime, and an incorrect
 shutdown-method name in the distribution checker. All three were corrected. Test-only Gson 2.14.0 and Log4j 2.26.0
@@ -79,4 +81,5 @@ publication has been performed.
 - [Selected NetworkManager patch](https://github.com/CleanroomMC/Cleanroom/blob/0.6.13-alpha/patches/minecraft/net/minecraft/network/NetworkManager.java.patch).
 - [Build instructions](DEVELOPMENT.md), [runtime instructions](USER_GUIDE.md), [release gates](RELEASE_CHECKLIST.md).
 
-Historical NeoForge and Forge validation remains historical. There is no ZstdNet compatibility work in this migration.
+Historical NeoForge and Forge validation remains historical. Cleanroom ZstdNet composition is implemented against the
+verified `1.4.7-cleanroom-alpha.1` API, but still requires the runtime client/server validation gates listed above.

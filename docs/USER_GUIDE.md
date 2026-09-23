@@ -18,9 +18,11 @@ For external-proxy WSS, follow [CONFIGURATION.md](CONFIGURATION.md); TLS is term
 
 ## Discovery and fallback
 
-The client requests Discovery v1, validates its content, selects an advertised compatible base route and starts a local
-wstunnel process. There are no compression-filter adapters on this platform. Routes with unknown required filters are
-rejected. An advertised unfiltered alternative may be selected; an unadvertised raw target may not.
+The client requests Discovery v1, validates its content, selects an advertised compatible route and starts a local
+wstunnel process. With ZstdNet Cleanroom `1.4.7-cleanroom-alpha.1` installed on both sides, the higher-priority
+`zstdnet-stream` route is composed through ZstdNet's own local proxy. Without that exact verified ZstdNet API, the
+route is skipped. Routes with unknown required filters are rejected; an advertised unfiltered alternative may be
+selected, but an unadvertised raw target may not.
 
 When Discovery is unavailable, `legacyFallback=true` permits the existing WSS/WS/TCP probe. Set `legacyFallback=false`
 to fail instead. Invalid Discovery/signatures or an incompatible manifest are not treated as permission to downgrade.
@@ -43,6 +45,10 @@ Client Discovery success must contain `selected Discovery route`.
 The generated `config/miguelnetwork/generated/detected-server.toml` reports the effective Minecraft target.
 Do not edit it. Change `server.properties` or `config/miguelnetwork-server.toml` and restart instead.
 Client trust data is stored in `config/miguelnetwork/client-trust.json`; preserve it when optional pinning is used.
+
+The optional ZstdNet adapter is enabled by installing the matching Cleanroom ZstdNet alpha on both client and server.
+Do not assume compatibility for other ZstdNet versions: the adapter logs a compatibility warning and leaves ZstdNet's
+original connection path in place. The server log also reports the detected ZstdNet listener when the route is advertised.
 
 For startup errors, check distinct ports, the native platform/permissions, effective TOML values and sidecar output.
 Keep generated config, credentials, keys and logs out of Git. Share only redacted diagnostic excerpts.

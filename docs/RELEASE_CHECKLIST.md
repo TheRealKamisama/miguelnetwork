@@ -8,6 +8,9 @@
   native hash verification does not finish the transitive license/SBOM audit.
 - On real Cleanroom client/server installations, verify server-list status, login, cancel/reconnect, original handshake
   domain/port and Forge marker, and dedicated-server client-class isolation.
+- When ZstdNet Cleanroom `1.4.7-cleanroom-alpha.1` is installed, verify manual and `auto_takeover` listener/backend
+  discovery, the advertised `zstdnet-stream` route, compressed login/status traffic, loopback recursion guard, reconnect
+  and fallback to `minecraft-primary` without it.
 - Verify default unsigned STANDALONE WS/Discovery, optional external-proxy WSS, invalid manifests, unknown required filters,
   and Discovery failure with legacyFallback enabled and disabled.
 - Cover Windows and Linux x86-64, concurrent duplex traffic, half-close, network interruption, shutdown and process cleanup.

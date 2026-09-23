@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.client;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
+import io.github.therealkamisama.miguelnetwork.compat.ZstdNetServerCompatibility;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
@@ -26,10 +27,12 @@ import java.util.Optional;
 public final class ClientTunnelManager {
     private static final Duration DISCOVERY_TIMEOUT = Duration.ofMillis(1500);
     private static final Duration TCP_DISCOVERY_TTL = Duration.ofSeconds(30);
+    private static final Duration INTERNAL_LOOPBACK_TTL = Duration.ofSeconds(30);
     private static final int MAX_DISCOVERED_ROUTES = 256;
     private static final Map<String, ClientTunnel> TUNNELS = new LinkedHashMap<>(16, 0.75f, true);
     private static final Map<String, CachedManifest> MANIFESTS = new LinkedHashMap<>(16, 0.75f, true);
     private static final Map<String, CachedLegacyRoute> LEGACY_ROUTES = new LinkedHashMap<>(16, 0.75f, true);
+    private static final Map<Integer, Long> INTERNAL_LOOPBACK_PORTS = new LinkedHashMap<>();
     private static Path gameDirectory;
     private static ClientTrustStore trustStore;
     private static ClientDiscoveryService discoveryService;
@@ -47,22 +50,70 @@ public final class ClientTunnelManager {
     }
 
     public static synchronized InetSocketAddress redirect(InetSocketAddress original) {
-        if (!ClientConfig.enabled()) {
+        if (!ClientConfig.enabled() || consumeInternalLoopback(original)) {
             return original;
         }
-        RoutePlan route = resolveRoute(original).orElse(null);
+        RoutePlan route = resolveRoute(original, false).orElse(null);
         if (route == null || route.tcp()) {
             return original;
         }
         return startOrReuse(original, route).localAddress();
     }
 
-    private static Optional<RoutePlan> resolveRoute(InetSocketAddress original) {
+    /**
+     * Prepares the base wstunnel route used underneath ZstdNet's own local
+     * compressor. The route must explicitly advertise the zstdnet-stream
+     * filter; this method never turns a raw route into a compressed one.
+     */
+    public static synchronized Optional<PreparedTunnel> prepareForZstdNet(InetSocketAddress original) {
+        if (!ClientConfig.enabled() || !ZstdNetServerCompatibility.isSupportedInstalled()) {
+            return Optional.empty();
+        }
+        Optional<RoutePlan> selected = resolveRoute(original, true)
+                .filter(route -> !route.tcp())
+                .filter(route -> route.discoveryRoute().filters().stream().anyMatch(filter ->
+                        MiguelNetworkProtocol.ZSTDNET_FILTER.equals(filter.id())
+                                && filter.version() == 1));
+        if (selected.isEmpty()) {
+            return Optional.empty();
+        }
+        ClientTunnel tunnel = startOrReuse(original, selected.get());
+        return Optional.of(new PreparedTunnel(tunnel.localAddress(), selected.get().discoveryRoute()));
+    }
+
+    /** Marks the one loopback connection created by a composed ZstdNet login as internal. */
+    public static synchronized void registerInternalLoopbackPort(int port) {
+        if (port > 0 && port <= 65535) {
+            removeExpiredInternalPorts();
+            INTERNAL_LOOPBACK_PORTS.put(port, System.nanoTime());
+            while (INTERNAL_LOOPBACK_PORTS.size() > 256) {
+                Iterator<Integer> iterator = INTERNAL_LOOPBACK_PORTS.keySet().iterator();
+                iterator.next();
+                iterator.remove();
+            }
+        }
+    }
+
+    private static boolean consumeInternalLoopback(InetSocketAddress address) {
+        String host = address.getHostString();
+        if (!(host.equals("127.0.0.1") || host.equals("localhost") || host.equals("::1"))) {
+            return false;
+        }
+        removeExpiredInternalPorts();
+        return INTERNAL_LOOPBACK_PORTS.remove(address.getPort()) != null;
+    }
+
+    private static void removeExpiredInternalPorts() {
+        long cutoff = System.nanoTime() - INTERNAL_LOOPBACK_TTL.toNanos();
+        INTERNAL_LOOPBACK_PORTS.entrySet().removeIf(entry -> entry.getValue() < cutoff);
+    }
+
+    private static Optional<RoutePlan> resolveRoute(InetSocketAddress original, boolean permitZstdNet) {
         ensureDiscovery();
         String endpoint = endpoint(original);
         CachedManifest cached = MANIFESTS.get(endpoint);
         if (cached != null && !cached.expired()) {
-            return Optional.of(requireCompatibleRoute(cached.manifest(), endpoint));
+            return Optional.of(requireCompatibleRoute(cached.manifest(), permitZstdNet, endpoint));
         }
         MANIFESTS.remove(endpoint);
 
@@ -78,7 +129,7 @@ public final class ClientTunnelManager {
             return legacyRoute(original, endpoint, exception);
         }
         rememberManifest(endpoint, manifest);
-        RoutePlan selected = requireCompatibleRoute(manifest, endpoint);
+        RoutePlan selected = requireCompatibleRoute(manifest, permitZstdNet, endpoint);
         MiguelNetwork.LOGGER.info("MiguelNetwork selected Discovery route {} for {}",
                 selected.discoveryRoute().id(), endpoint);
         return Optional.of(selected);
@@ -86,15 +137,21 @@ public final class ClientTunnelManager {
 
     private static RoutePlan requireCompatibleRoute(
             DiscoveryManifest manifest,
+            boolean permitZstdNet,
             String endpoint
     ) {
-        return select(manifest, requiresWss(endpoint))
+        return select(manifest, permitZstdNet, requiresWss(endpoint))
                 .orElseThrow(() -> new IllegalStateException(
                         "Discovery returned no compatible route for " + endpoint));
     }
 
-    private static Optional<RoutePlan> select(DiscoveryManifest manifest, boolean requireWss) {
-        return ClientRouteSelector.select(manifest, requireWss).map(RoutePlan::discovery);
+    private static Optional<RoutePlan> select(
+            DiscoveryManifest manifest,
+            boolean permitZstdNet,
+            boolean requireWss
+    ) {
+        boolean adapterAvailable = permitZstdNet && ZstdNetServerCompatibility.isSupportedInstalled();
+        return ClientRouteSelector.select(manifest, requireWss, adapterAvailable).map(RoutePlan::discovery);
     }
 
     private static Optional<RoutePlan> legacyRoute(
@@ -266,6 +323,10 @@ public final class ClientTunnelManager {
         TUNNELS.clear();
         MANIFESTS.clear();
         LEGACY_ROUTES.clear();
+        INTERNAL_LOOPBACK_PORTS.clear();
+    }
+
+    public record PreparedTunnel(InetSocketAddress address, DiscoveryRoute route) {
     }
 
     private record ClientTunnel(ManagedWstunnelProcess process, int localPort) {

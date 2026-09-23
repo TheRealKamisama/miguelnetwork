@@ -66,6 +66,10 @@ generated restriction still limits requests to the detected host and ports.
 Routes are considered in descending priority. A client skips a route when it does not implement a required filter.
 Unknown optional filters may be ignored.
 
+MiguelNetwork's Cleanroom client implements `zstdnet-stream` version 1 only when the verified
+ZstdNet `1.4.7-cleanroom-alpha.1` API is present. The adapter composes the route through ZstdNet's own local proxy;
+it does not implement compression itself. Other required filters remain unsupported and are rejected.
+
 ## Optional signed envelope
 
 When the server enables `discovery.signResponses`, it wraps the exact manifest bytes:

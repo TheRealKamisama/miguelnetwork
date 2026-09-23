@@ -22,10 +22,13 @@ Normal server EULA acceptance remains an operator action. Do not change an exist
 `build` must produce and verify the `remapShadowJar` artifact, not a development JAR.
 It contains `mcmod.info`, `ModType: CRL`, `MixinConfigs`, client-only JAVA_25 Mixin configuration,
 the shaded NightConfig parser and both pinned native binaries with their legal/provenance files.
-The default CleanMix phase registers Minecraft mixins; there is no ZstdNet hook or unnecessary coremod transformer.
+The default CleanMix phase registers the Minecraft connection/shutdown mixins and an optional pseudo-mixin for the
+verified ZstdNet Cleanroom client lifecycle; no ZstdNet classes or compression library are bundled by MiguelNetwork.
 
 The connection injection targets `NetworkManager.createNetworkManagerAndConnect(InetAddress,int,boolean)` and changes
-the Netty connect argument pair once. Minecraft handshake parameters and the Forge marker remain with the original caller.
+the Netty connect argument pair once. When the optional ZstdNet route is selected, its own `LocalZstdNet` proxy is
+created first and the one subsequent loopback connection is marked internal. Minecraft handshake parameters and the
+Forge marker remain with the original caller.
 Check transformed production bytecode and a real status/login/reconnect session before declaring runtime compatibility.
 
 Tests cover base routing/filter rejection, startup-only TOML validation, Discovery, signatures/trust, command construction,

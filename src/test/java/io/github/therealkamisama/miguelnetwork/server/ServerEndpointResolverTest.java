@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -37,5 +38,18 @@ class ServerEndpointResolverTest {
         var resolved = ServerEndpointResolver.resolve(temporaryDirectory, 25565);
 
         assertEquals("127.0.0.1", resolved.targetHost());
+    }
+
+    @Test
+    void recordsTheOptionalZstdNetListenerSeparately() throws Exception {
+        var resolved = ServerEndpointResolver.resolve(temporaryDirectory, 25566, OptionalInt.of(35565));
+
+        assertEquals(35565, resolved.zstdNetPort());
+        ServerEndpointResolver.writeDetectedConfiguration(
+                temporaryDirectory, resolved, DeploymentMode.STANDALONE, "0.0.0.0", 35548);
+        String generated = Files.readString(temporaryDirectory.resolve(
+                "config/miguelnetwork/generated/detected-server.toml"));
+        assertTrue(generated.contains("zstdNetDetected = true"));
+        assertTrue(generated.contains("zstdNetTargetPort = 35565"));
     }
 }

@@ -3,6 +3,7 @@ package io.github.therealkamisama.miguelnetwork.server;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryCodec;
+import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryFilter;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryIdentity;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryManifest;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryRoute;
@@ -17,15 +18,18 @@ final class DiscoveryDocumentProvider {
     private final DiscoveryIdentity identity;
     private final String targetHost;
     private final int minecraftPort;
+    private final Integer zstdNetPort;
 
     private DiscoveryDocumentProvider(
             DiscoveryIdentity identity,
             String targetHost,
-            int minecraftPort
+            int minecraftPort,
+            Integer zstdNetPort
     ) {
         this.identity = identity;
         this.targetHost = targetHost;
         this.minecraftPort = minecraftPort;
+        this.zstdNetPort = zstdNetPort;
     }
 
     static DiscoveryDocumentProvider create(
@@ -35,7 +39,7 @@ final class DiscoveryDocumentProvider {
         DiscoveryIdentity identity = ServerConfig.signDiscoveryResponses()
                 ? DiscoveryIdentity.loadOrCreate(gameDirectory.resolve("config/miguelnetwork/generated")) : null;
         return new DiscoveryDocumentProvider(
-                identity, endpoints.targetHost(), endpoints.minecraftPort());
+                identity, endpoints.targetHost(), endpoints.minecraftPort(), endpoints.zstdNetPort());
     }
 
     byte[] response(String rawAudience, byte[] request) throws Exception {
@@ -61,6 +65,13 @@ final class DiscoveryDocumentProvider {
 
     private List<DiscoveryRoute> routes(HostPort advertised) {
         List<DiscoveryRoute> routes = new ArrayList<>();
+        if (zstdNetPort != null && zstdNetPort != minecraftPort) {
+            routes.add(new DiscoveryRoute(
+                    "zstdnet-primary", ServerConfig.advertisedTransport(), advertised.host(), advertised.port(),
+                    ServerConfig.pathPrefix(), targetHost, zstdNetPort, 200,
+                    List.of(new DiscoveryFilter(MiguelNetworkProtocol.ZSTDNET_FILTER, 1, true))
+            ));
+        }
         routes.add(new DiscoveryRoute(
                 "minecraft-primary", ServerConfig.advertisedTransport(), advertised.host(), advertised.port(),
                 ServerConfig.pathPrefix(), targetHost, minecraftPort, 100, List.of()

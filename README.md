@@ -8,7 +8,9 @@ MiguelNetwork 用内置的 wstunnel 10.7.1，将 Minecraft TCP 字节流经 WebS
 无需证书或外部代理。需要 WSS 的运营者可选择 `EXTERNAL_PROXY`，由 Nginx/Caddy 等外部网关终止 TLS。
 Mod 不管理证书，签名 Discovery 和防降级策略默认关闭。
 
-此平台没有 ZstdNet 适配或附加压缩 filter。Minecraft 本身的压缩与加密字节流保持透明转发。
+可选的 ZstdNet Cleanroom `1.4.7-cleanroom-alpha.1` 适配器会在 Discovery 广告
+`zstdnet-stream` 时先建立 MiguelNetwork 隧道，再交给 ZstdNet 负责压缩；未识别的必需 filter 仍会拒绝。
+没有 ZstdNet 时，客户端选择普通 Minecraft 路由。Minecraft 本身的压缩与加密字节流保持透明转发。
 客户端和服务端需要相匹配的 Minecraft 1.12.2 / Mod 集合；这不是不同 Minecraft 版本之间的协议转换器。
 
 ## 运行目标
@@ -58,7 +60,8 @@ Unimined 1.4.36-kappa 负责 MCP stable 39-1.12 和生产 remap；NightConfig �
 
 This branch ports MiguelNetwork to Minecraft 1.12.2, Cleanroom 0.6.13-alpha and Java 25.
 The default standalone gateway serves Discovery v1 and plain WebSocket on one public port (35548).
-WSS is optional and terminated by an external proxy. No ZstdNet adapter is included.
+WSS is optional and terminated by an external proxy. The optional ZstdNet Cleanroom
+`1.4.7-cleanroom-alpha.1` adapter composes the advertised `zstdnet-stream` route; unknown required filters remain rejected.
 Use the remapped production JAR on matching client/server installations. See the migration record for completed checks
 and outstanding game/Linux validation; historical NeoForge validation does not establish Cleanroom compatibility.
 

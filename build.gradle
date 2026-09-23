@@ -223,7 +223,7 @@ def verifyDistribution = tasks.register('verifyDistribution') {
             }
             def mixin = new JsonSlurper().parseText(readText('miguelnetwork.mixins.json'))
             if (mixin.compatibilityLevel != 'JAVA_25'
-                    || mixin.client != ['NetworkManagerMixin', 'MinecraftShutdownMixin']
+                    || mixin.client != ['NetworkManagerMixin', 'MinecraftShutdownMixin', 'ZstdNetClientProxyMixin']
                     || mixin.mixins || mixin.server) {
                 throw new GradleException('Unexpected Mixin configuration or client/server isolation')
             }
@@ -233,7 +233,8 @@ def verifyDistribution = tasks.register('verifyDistribution') {
             zip.entries().each { entry ->
                 if (entry.name == 'META-INF/neoforge.mods.toml' || entry.name == 'META-INF/mods.toml'
                         || entry.name.startsWith('com/electronwill/nightconfig/')
-                        || entry.name.contains('ZstdNet') || entry.name.startsWith('net/neoforged/')) {
+                        || entry.name.startsWith('cn/tohsaka/factory/zstdnet/')
+                        || entry.name.startsWith('net/neoforged/')) {
                     throw new GradleException("Unexpected platform/dependency entry ${entry.name}")
                 }
                 if (entry.name.endsWith('.class')) {
@@ -251,7 +252,7 @@ def verifyDistribution = tasks.register('verifyDistribution') {
             }
             // Unimined may emit a refmap or remap selectors directly; inspect the production result in either case.
             String selectors = ''
-            ['NetworkManagerMixin', 'MinecraftShutdownMixin'].each { name ->
+            ['NetworkManagerMixin', 'MinecraftShutdownMixin', 'ZstdNetClientProxyMixin'].each { name ->
                 def entry = zip.getEntry("io/github/therealkamisama/miguelnetwork/mixin/${name}.class")
                 if (entry == null) throw new GradleException("Missing ${name}")
                 selectors += zip.getInputStream(entry).withCloseable { new String(it.readAllBytes(), 'ISO-8859-1') }

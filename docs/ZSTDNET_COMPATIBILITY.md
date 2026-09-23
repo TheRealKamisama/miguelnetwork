@@ -1,11 +1,8 @@
-> Historical NeoForge 1.21.1 documentation. It is not Cleanroom validation or release guidance.
-> For this branch see [Cleanroom migration](CLEANROOM_MIGRATION.md) and [the current user guide](USER_GUIDE.md).
+# ZstdNet Cleanroom compatibility
 
-# ZstdNet compatibility
-
-MiguelNetwork `0.2.0` contains the unilateral compatibility adapter introduced in
-alpha.6 for ZstdNet `1.4.7` and `1.4.8` on Minecraft 1.21.1 NeoForge. ZstdNet
-itself and its JAR are not modified, and no Zstd compression code is copied.
+MiguelNetwork `0.2.0` includes an optional reflective adapter for the verified
+ZstdNet Cleanroom `1.4.7-cleanroom-alpha.1` API on Minecraft 1.12.2 / Cleanroom / Java 25.
+ZstdNet and its JAR are not modified, and MiguelNetwork does not copy or reimplement Zstd compression.
 
 ## Byte-stream composition
 
@@ -21,33 +18,35 @@ Minecraft client
   -> Minecraft backend
 ```
 
-MiguelNetwork sees and transports only the already-compressed TCP byte stream. Server-list status traffic can select
-the lower-priority raw route and therefore does not require Minecraft packet parsing in MiguelNetwork.
+MiguelNetwork transports only the already-compressed TCP byte stream. Status traffic is still handled by ZstdNet's
+own proxy and server runtime; MiguelNetwork does not parse Minecraft packets.
 
-When compatible ZstdNet is loaded on the server, MiguelNetwork reads its public `readListenPort()` API reflectively,
-adds that port to the generated wstunnel restriction, and advertises a higher-priority route with the required
-`zstdnet-stream` filter. A second raw route targets the Minecraft backend, so clients without ZstdNet still have a
-usable MiguelNetwork route.
+On a server with the verified ZstdNet version, MiguelNetwork reads the public
+`ServerProxyConfigFile.readListenPort()` API reflectively. When ZstdNet's dedicated-server `auto_takeover` plan is
+active, it also records that plan's resolved listener and backend ports. The detected listener is added to the
+generated wstunnel restriction, and a higher-priority `zstdnet-primary` route with the required `zstdnet-stream` filter
+is advertised. The ordinary `minecraft-primary` route remains available for clients without ZstdNet; a disabled
+ZstdNet server proxy is not advertised.
 
-On the client, the supported ZstdNet coremod normally creates its loopback proxy before Minecraft reaches
-`Connection.connect`. MiguelNetwork uses an optional pseudo-mixin on ZstdNet's hook class, creates the wstunnel route
-first, invokes ZstdNet's public `LocalZstdNet.start(...)` API reflectively, and publishes the returned handle back to
-ZstdNet so its normal UI/login/logout lifecycle remains responsible for closing it. Injecting into the hook class
-avoids relying on transformation order between ZstdNet's coremod and MiguelNetwork's mixins. The one subsequent
-loopback connection is marked as internal to prevent double tunnelling. ZstdNet's normal server-list UI path reaches
-the hook with its bypass flag set and an already-created loopback proxy; MiguelNetwork restores the logical endpoint
-from `ServerData`, replaces that premature direct proxy, and consumes the bypass flag.
+On a client, the optional pseudo-mixin enters ZstdNet's `ClientProxy.startConnection` lifecycle. When Discovery selects
+the required filter, MiguelNetwork prepares its wstunnel route first, invokes ZstdNet's public
+`LocalZstdNet.start(...)` overload with the original logical host/port as the presented handshake address, publishes the
+returned `ProxyHandle` to ZstdNet's normal lifecycle, and constructs its internal loopback `GuiConnecting` under
+ZstdNet's scoped `InternalConnectGuard`. The loopback port is consumed once by MiguelNetwork so the connection is not
+tunneled a second time.
 
 ## Version and failure policy
 
-The reflective adapter is enabled only when the installed Mod metadata version is exactly `1.4.7` or `1.4.8` and the
-expected classes, methods and fields are present. This narrow gate is deliberate because ZstdNet exposes no stable
-integration SPI for replacing the upstream address and adopting an externally created `ProxyHandle`.
+The adapter is enabled only when the loaded Mod metadata version is exactly
+`1.4.7-cleanroom-alpha.1` and the expected classes, methods and fields are present. This narrow gate is deliberate:
+ZstdNet does not expose a stable integration SPI for replacing its upstream address and adopting an externally created
+proxy handle.
 
-If a Discovery manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. A compatible
-raw route may still be selected. A manifest with no compatible route fails closed rather than connecting to an
-unadvertised backend. Unknown ZstdNet versions use their original hook and log a compatibility warning; they are not
-claimed as supported until their exact API has been tested.
+If a Discovery manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. An advertised
+unfiltered route may still be selected. A manifest with no compatible route fails closed rather than connecting to an
+unadvertised backend. Unknown ZstdNet versions retain ZstdNet's original path and log a compatibility warning; they are
+not claimed as supported until their exact API is tested.
 
-The only private reflection in the adapter is the narrow handoff to `ConnectScreenHooks.currentProxy` and its
-lock. Compression, framing, status probing, statistics and proxy shutdown continue to be owned by ZstdNet.
+The adapter owns no compression, framing, status probing, statistics or proxy shutdown. Those remain ZstdNet's
+responsibility. MiguelNetwork's default STANDALONE/plain-WS deployment and optional external-proxy WSS policy are
+unchanged.
