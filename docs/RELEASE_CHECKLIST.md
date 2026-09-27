@@ -21,12 +21,16 @@ Run the wrapper from the repository root:
 
 ```text
 .\gradlew.bat clean test jar
+.\gradlew.bat curseForgeJar verifyCurseForgeDistribution
 git diff --check
 ```
 
-- [ ] All tests pass and the JAR exists under `build/libs/`.
-- [ ] Inspect the JAR for `META-INF/neoforge.mods.toml`, the native binaries,
+- [ ] All tests pass and both JARs exist under `build/libs/`.
+- [ ] Inspect the bundled JAR for `META-INF/neoforge.mods.toml`, the native binaries,
       `wstunnel-manifest.json`, notices, and licenses.
+- [ ] Inspect the `-curseforge.jar` for `CURSEFORGE.md`, its distribution descriptor,
+      manifest, notices, and licenses; confirm it has no `native/**`, `.exe`, `.dll`,
+      or `.so` entry.
 - [ ] Verify the embedded metadata reports the intended version.
 - [ ] Record a SHA-256 checksum (PowerShell: `Get-FileHash <jar> -Algorithm SHA256`).
 - [ ] Recheck the bundled wstunnel checksums and `docs/THIRD_PARTY_LICENSE_AUDIT.md`
@@ -56,6 +60,10 @@ Do not infer a GitHub repository from the project name.
 
 ## CurseForge automation gate
 
+- [ ] Obtain new written CurseForge approval for the disclosed runtime-download
+      design, or record an explicit maintainer decision to accept the rejection
+      risk. Existing feedback says runtime downloading may also be rejected; an
+      antivirus pass is not policy approval.
 - [ ] Confirm that the GitHub Actions environment is named exactly `curseforge`.
 - [ ] Configure the environment secret `CURSEFORGE_API_TOKEN` through GitHub's UI
       or `gh secret set`; never paste it into an issue, chat, workflow, or commit.
@@ -77,10 +85,11 @@ After the user confirms the remote, release notes, tag, and publication scope:
 3. Push the branch and tag to the confirmed GitHub remote. Pushing the tag starts
    `.github/workflows/release.yml`.
 4. Approve the `curseforge` environment deployment if protection rules require it.
-5. Verify that the workflow built and checked the JAR, published the JAR and
-   `SHA256SUMS` to the GitHub Release, created the provenance attestation, and
-   uploaded the same JAR to CurseForge.
-6. Record the GitHub Release URL, CurseForge file URL, and SHA-256.
+5. Verify that the workflow built and checked both JARs, published the bundled JAR
+   and `SHA256SUMS` to the GitHub Release, created the provenance attestation, and
+   uploaded only the `-curseforge.jar` to CurseForge.
+6. Preserve the CurseForge upload response and record the GitHub Release URL,
+   CurseForge file URL, and both SHA-256 values.
 
 Do not manually upload the JAR again after the workflow succeeds. If a retry is
 needed after the CurseForge upload step may have completed, inspect the project

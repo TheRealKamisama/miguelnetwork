@@ -1,8 +1,8 @@
 # MiguelNetwork
 
 > **Short description / 简短介绍**
-> Carry Minecraft TCP over WebSocket with a bundled Rust wstunnel sidecar and a one-port standalone gateway. Mitigates raw-TCP QoS/blocking; optional proxy-terminated WSS; ZstdNet 1.4.7/1.4.8.
-> 通过内置 Rust wstunnel sidecar 和单端口 standalone 网关承载 Minecraft TCP，缓解原生 TCP QoS/阻断；可选反代 WSS，兼容 ZstdNet 1.4.7/1.4.8。
+> MiguelNetwork adds WebSocket transport support to Minecraft for WebSocket-capable reverse proxies, managed ingress, and hosting platforms without arbitrary TCP listeners.
+> MiguelNetwork 为 Minecraft 增加 WebSocket 传输支持，适用于支持 WebSocket 的反向代理、托管入口及不开放任意 TCP 监听端口的托管平台。
 
 ---
 
@@ -15,20 +15,16 @@ Minecraft TCP 字节流承载在 WebSocket 上，同时保留玩家熟悉的服�
 
 玩家仍然填写普通的服务器域名和端口。Minecraft 的握手地址、登录加密、数据包格式和游戏内容均不改变；
 MiguelNetwork 只替换底层网络路径。与在 Java 网络栈中重新实现 WebSocket 的方案不同，本项目由 Mod 管理
-随 JAR 分发的 **wstunnel Rust sidecar 子进程**，实际隧道和长连接交给成熟的 wstunnel 实现。
+经过固定版本和哈希校验的 **wstunnel Rust sidecar 子进程**，实际隧道和长连接交给成熟的 wstunnel 实现。
 
-### 核心价值：缓解三网公网 IP 的 TCP QoS 与连接阻断
+### 主要用途：接入 WebSocket 网关与托管入口
 
-近期部分中国电信、中国移动和中国联通公网 IP 用户遇到针对入站长连接或原生 Minecraft TCP 流量的 QoS、
-连接重置、间歇性阻断等问题，夜间高峰尤其明显。MiguelNetwork 把原生 Minecraft TCP 的外层承载转换为
-WebSocket，使连接不再直接表现为原生 Minecraft TCP。
+MiguelNetwork 面向需要把 Minecraft 部署在支持 WebSocket 的反向代理、托管入口或兼容 CDN 之后的服主，
+也适合只开放 HTTP/WebSocket、不能开放任意 TCP 监听端口的托管平台。它可以整合公网入口，并让 Minecraft
+与 ZstdNet 后端仅保留在私有网络中。
 
-对于**只针对原生 TCP 特征、端口或连接形态**实施的限制，这条路径可以绕过或显著缓解 QoS/阻断，减少购买
-商业游戏中转、专线或高价托管的必要，从而降低自建 Minecraft 服务器的成本，并提高晚高峰时段的连接成功率
-与可用性。
-
-实际效果取决于当地运营商策略、网络设备和线路质量。MiguelNetwork 不是通用 VPN，无法绕过所有网络策略，
-也不会改善底层物理链路丢包。请遵守当地法律、运营商条款和所使用代理服务的规则。
+管理员可以使用所选网关或 CDN 提供的路由、监控、限速、源站保护和 DDoS 缓解能力。MiguelNetwork 本身
+不提供 CDN 或 DDoS 缓解，也不把 WebSocket 描述为普通网页流量。
 
 ### 部署原则：standalone 优先，加密可选
 
@@ -42,12 +38,12 @@ MiguelNetwork **不强制传输层加密**。默认并推荐的部署方式是 `
 
 ### 主要功能
 
-- **成熟 Rust sidecar 路线**：使用现有 wstunnel 项目处理 WebSocket 与长连接。上游项目的长期运行能力已有
-  真实使用历史；MiguelNetwork 固定并集成经过验证的版本，避免重新编写一套年轻的传输协议栈。
+- **成熟 Rust sidecar 路线**：使用固定并校验的 wstunnel 10.7.1 处理 WebSocket 与长连接；GitHub 发行物
+  内置二进制，CurseForge 专用发行物则在用户明确同意后下载当前平台版本。
 - **开箱即用的 standalone 网关**：默认把 Discovery 和 wstunnel 复用到一个公网 WS 端口，服主只需开放
   一个额外 TCP 端口，不需要反向代理和证书。
-- **无需单独安装 wstunnel**：Windows x64 与 Linux x64 官方二进制随 Mod JAR 分发，运行时自动解压、启动、
-  监控和关闭。
+- **两种透明发行方式**：GitHub 自包含 JAR 自动解压内置二进制；CurseForge JAR 不含原生可执行文件，可使用
+  管理员指定的外部路径，或通过独立配置明确允许下载并校验固定版本。
 - **供应链校验**：构建时校验上游归档及二进制 SHA-256；最终 JAR 再次检查固定哈希、许可证和来源文件。
 - **对 Minecraft 透明**：不修改 Minecraft 数据包、登录加密或游戏内容，只把底层 Socket 指向本地隧道；
   原始逻辑服务器地址仍用于 Minecraft 握手。
@@ -105,7 +101,7 @@ MiguelNetwork 只传输已经压缩的 TCP 字节流。Discovery 会优先发布
 
 ### 支持环境
 
-- MiguelNetwork 0.2.0 技术预览版
+- MiguelNetwork 0.2.1 技术预览版
 - Minecraft Java Edition 1.21.1
 - Java 21
 - 编译基线：NeoForge 21.1.77
@@ -115,7 +111,7 @@ MiguelNetwork 只传输已经压缩的 TCP 字节流。Discovery 会优先发布
 - 可选兼容：ZstdNet **1.4.7 和 1.4.8**
 - 安装 ZstdNet 时，其已核实的 JAR 元数据要求 NeoForge **21.1.221 或更高版本**
 
-macOS、ARM、Bedrock、UDP Mod 流量和 SRV 重定向目前不受支持。0.2.0 仍是技术预览版，正式投入长期运行前
+macOS、ARM、Bedrock、UDP Mod 流量和 SRV 重定向目前不受支持。0.2.1 仍是技术预览版，正式投入长期运行前
 应在目标整合包和网络环境中验证。
 
 ### 使用说明
@@ -123,7 +119,8 @@ macOS、ARM、Bedrock、UDP Mod 流量和 SRV 重定向目前不受支持。0.2.
 #### 玩家/客户端
 
 1. 安装 Minecraft 1.21.1、Java 21 和合适版本的 NeoForge。
-2. 将 MiguelNetwork JAR 放入客户端 `mods` 目录；无需单独安装 wstunnel，也没有必需的前置 Mod。
+2. 将 MiguelNetwork JAR 放入客户端 `mods` 目录。GitHub Release JAR 已内置 wstunnel；CurseForge JAR 不含
+   原生程序，需要外部路径或在 `config/miguelnetwork-common.toml` 中明确设置 `[wstunnelDownload] enable = true`。
 3. 如需 ZstdNet，安装 1.4.7 或 1.4.8，并使用 NeoForge 21.1.221 或更新版本。
 4. 正常启动游戏，在服务器列表中填写服主提供的 `域名或IP:publicPort`。
 5. 客户端会自动请求 Discovery、选择兼容路由并启动本地 sidecar。
@@ -249,8 +246,8 @@ MiguelNetwork 的私有上游保持 WS。
 
 ### 许可证与第三方组件
 
-MiguelNetwork 使用 Apache-2.0 许可证。随包分发的 wstunnel 使用 BSD-3-Clause 许可证；相应许可证、版权
-声明、固定版本、哈希和来源信息均包含在发布 JAR 中。
+MiguelNetwork 使用 Apache-2.0 许可证。wstunnel 使用 BSD-3-Clause 许可证；相应许可证、版权声明、固定版本、
+哈希和来源信息均包含在两种发布 JAR 中，GitHub 自包含发行物另外包含经过校验的可执行文件。
 
 ---
 
@@ -263,21 +260,18 @@ Minecraft TCP byte stream over WebSocket while preserving the normal server list
 
 Players still enter an ordinary hostname and port. Minecraft's logical handshake address, login encryption, packet
 format, and gameplay remain unchanged; only the underlying network path is redirected. Instead of reimplementing
-WebSocket in Java, MiguelNetwork manages a **bundled Rust wstunnel sidecar** and delegates tunnelling and long-lived
-connections to the mature wstunnel project.
+WebSocket in Java, MiguelNetwork manages a **pinned and verified Rust wstunnel sidecar** and delegates tunnelling and
+long-lived connections to the mature wstunnel project.
 
-### Primary use case: mitigating ISP QoS and raw-TCP blocking
+### Primary use case: WebSocket gateways and managed ingress
 
-Some public-IP users of China Telecom, China Mobile, and China Unicom have experienced QoS, connection resets, or
-intermittent blocking that targets inbound long-lived connections or native Minecraft TCP, especially during evening
-peak hours. MiguelNetwork changes the outer transport from native Minecraft TCP to WebSocket.
+MiguelNetwork is intended for operators deploying Minecraft behind WebSocket-capable reverse proxies, managed ingress,
+or compatible CDNs, including hosting platforms that expose HTTP/WebSocket but not arbitrary TCP listeners. It can
+consolidate public entry points while keeping the Minecraft and ZstdNet backends private.
 
-When restrictions target native-TCP characteristics, ports, or connection patterns, this route can bypass or
-substantially mitigate them. It may reduce the need for paid game relays, dedicated lines, or expensive hosting,
-lowering the cost of self-hosting while improving peak-hour connection success and availability.
-
-Results depend on local ISP policy, network equipment, and route quality. MiguelNetwork is not a general VPN, cannot
-bypass every policy, and cannot repair packet loss on the underlying link. Follow applicable laws and service terms.
+Operators may use routing, monitoring, rate limiting, origin protection, and DDoS mitigation supplied by their selected
+gateway or CDN. MiguelNetwork does not itself provide a CDN or DDoS mitigation, and does not describe WebSocket traffic
+as ordinary web traffic.
 
 ### Deployment principle: standalone first, encryption optional
 
@@ -292,12 +286,12 @@ does not obtain, manage, or require certificates.
 
 ### Main features
 
-- **Mature Rust sidecar:** WebSocket and long-lived transport are handled by the existing wstunnel project, whose
-  long-running behavior has real-world history. MiguelNetwork pins and integrates a verified version.
+- **Mature Rust sidecar:** WebSocket and long-lived transport use pinned and verified wstunnel 10.7.1. The GitHub
+  artifact bundles it; the CurseForge artifact downloads the current platform build only after explicit opt-in.
 - **One-port standalone gateway:** Discovery and wstunnel share one public plain-WS port by default. No reverse proxy or
   certificate setup is required.
-- **No separate wstunnel installation:** Official Windows x64 and Linux x64 executables are bundled, verified, extracted,
-  started, monitored, and stopped automatically.
+- **Two explicit distribution modes:** The self-contained GitHub JAR extracts its bundled executable. The CurseForge JAR
+  contains no native executable and uses either an operator path or an explicitly enabled, verified runtime download.
 - **Transparent to Minecraft:** Packets, login encryption, and gameplay are unchanged. Only the low-level socket target
   is redirected, while the original logical hostname remains in the Minecraft handshake.
 - **Automatic Discovery:** The client obtains the WS/WSS endpoint, path, and detected backend address from the logical
@@ -354,7 +348,7 @@ publishes a raw Minecraft route.
 
 ### Supported environment
 
-- MiguelNetwork 0.2.0 technical preview
+- MiguelNetwork 0.2.1 technical preview
 - Minecraft Java Edition 1.21.1
 - Java 21
 - Compile baseline: NeoForge 21.1.77
@@ -372,7 +366,8 @@ target modpack and network before long-term production use.
 #### Players / clients
 
 1. Install Minecraft 1.21.1, Java 21, and a suitable NeoForge version.
-2. Put the MiguelNetwork JAR in the client's `mods` directory. No separate wstunnel installation is needed.
+2. Put the MiguelNetwork JAR in the client's `mods` directory. The GitHub Release JAR bundles wstunnel. The CurseForge
+   JAR requires an external path or explicit `[wstunnelDownload] enable = true` in `config/miguelnetwork-common.toml`.
 3. To use ZstdNet, install 1.4.7 or 1.4.8 and use NeoForge 21.1.221 or newer.
 4. Enter the server owner's `hostname-or-IP:publicPort` in the normal server list.
 5. MiguelNetwork automatically requests Discovery, selects a route, and starts its local sidecar.
@@ -501,5 +496,6 @@ versions plus relevant redacted logs. Never publish private keys, tokens, or com
 
 ### License and third-party software
 
-MiguelNetwork is licensed under Apache-2.0. The bundled wstunnel executable remains under BSD-3-Clause; its license,
-copyright notice, pinned version, hashes, and provenance are included in the release JAR.
+MiguelNetwork is licensed under Apache-2.0. wstunnel remains under BSD-3-Clause; its license, copyright notice, pinned
+version, hashes, and provenance are included in both JARs. The self-contained GitHub artifact also includes the verified
+executables.

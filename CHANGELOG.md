@@ -2,11 +2,21 @@
 
 ## Unreleased
 
+## 0.2.1 - 2026-09-27
+
 - Download and verify pinned upstream wstunnel release archives as part of the Gradle build.
 - Verify native binary hashes and required licensing/provenance files inside the final Mod JAR.
 - Pin the Gradle 8.9 distribution SHA-256 used by the checked-in wrapper.
 - Add tag-driven GitHub Release, artifact attestation, checksums, and CurseForge publishing automation.
 - Resolve CurseForge upload metadata within the correct game, loader, and client/server version types.
+- Add a separate CurseForge artifact without bundled native executables while retaining the self-contained GitHub JAR.
+- Require explicit COMMON-config consent before the CurseForge distribution can acquire pinned wstunnel 10.7.1 at
+  runtime, with strict archive and executable SHA-256 verification and atomic installation.
+- Add fail-closed acquisition, archive-safety, concurrency, cache, distribution-content, and descriptor tests.
+- Rewrite current public descriptions around WebSocket gateways, managed ingress, private backends, and operator-provided
+  edge capabilities, with a dedicated bilingual CurseForge usage guide.
+- Publish the bundled JAR to GitHub Releases and only the native-free `-curseforge.jar` to CurseForge, retaining separate
+  checksums and the exact CurseForge upload response.
 
 ## 0.2.0 - 2026-09-08
 

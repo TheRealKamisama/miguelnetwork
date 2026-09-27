@@ -1,11 +1,25 @@
 # Configuration and deployment
 
-This guide applies to MiguelNetwork 0.2.0. For the shorter installation and
+This guide applies to MiguelNetwork 0.2.1. For the shorter installation and
 runtime-log checklist, see [`USER_GUIDE.md`](USER_GUIDE.md).
 
-MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` through NeoForge.
+MiguelNetwork generates `config/miguelnetwork-server.toml`, `config/miguelnetwork-client.toml`, and
+`config/miguelnetwork-common.toml` through NeoForge.
 The server configuration is a COMMON config so it is created in the documented top-level `config` directory, not under
 a world's `serverconfig` directory.
+
+The common file contains a separate acquisition consent switch:
+
+```toml
+[wstunnelDownload]
+enable = false
+```
+
+It is consulted only when the installed distribution has no bundled executable and no valid
+`-Dmiguelnetwork.wstunnel.path=<path>` override. Setting it to `true` allows MiguelNetwork to download only the pinned
+wstunnel 10.7.1 archive for the current supported platform from the official GitHub Release and install it after archive
+and executable SHA-256 verification. The bundled GitHub distribution never downloads merely because this setting is
+enabled.
 
 The Mod reads the running Minecraft port and `server-ip` from `server.properties`. A blank/wildcard `server-ip` becomes
 the loopback target `127.0.0.1`; an explicit address is preserved. Supported ZstdNet versions (currently 1.4.7 and

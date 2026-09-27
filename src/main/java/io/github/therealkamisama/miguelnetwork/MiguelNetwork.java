@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
+import io.github.therealkamisama.miguelnetwork.config.WstunnelDownloadConfig;
 import io.github.therealkamisama.miguelnetwork.server.ServerTunnelController;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -25,6 +26,7 @@ public final class MiguelNetwork {
 
     public MiguelNetwork(IEventBus modEventBus, ModContainer modContainer) {
         modContainer.registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "miguelnetwork-client.toml");
+        modContainer.registerConfig(ModConfig.Type.COMMON, WstunnelDownloadConfig.SPEC, "miguelnetwork-common.toml");
         // COMMON configs are materialized in config/. NeoForge SERVER configs live under a world's serverconfig
         // directory, which made the documented dedicated-server file appear to be missing.
         modContainer.registerConfig(ModConfig.Type.COMMON, ServerConfig.SPEC, "miguelnetwork-server.toml");

@@ -4,8 +4,10 @@ MiguelNetwork itself is licensed under the Apache License 2.0. The component bel
 
 ## wstunnel
 
-MiguelNetwork includes unmodified executable builds from
-[erebe/wstunnel](https://github.com/erebe/wstunnel), version 10.7.1.
+MiguelNetwork uses unmodified executable builds from
+[erebe/wstunnel](https://github.com/erebe/wstunnel), version 10.7.1. The self-contained GitHub distribution bundles
+them; the CurseForge distribution contains no native executable and can acquire the current platform build only after
+explicit operator opt-in.
 
 Copyright (c) 2016-2024, Erèbe - Romain Gerard.
 

@@ -233,6 +233,61 @@ def verifyDistribution = tasks.register('verifyDistribution') {
     }
 }
 
+def curseForgeJar = tasks.register('curseForgeJar', Jar) {
+    group = 'build'
+    description = 'Builds the CurseForge distribution without bundled native executables.'
+    dependsOn tasks.named('classes')
+    archiveClassifier = 'curseforge'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(sourceSets.main.output) {
+        exclude 'native/**'
+        exclude '**/*.exe'
+    }
+    from('CURSEFORGE.md')
+    from('src/curseforge/resources')
+}
+
+def verifyCurseForgeDistribution = tasks.register('verifyCurseForgeDistribution') {
+    group = 'verification'
+    description = 'Verifies that the CurseForge JAR has disclosures and no native executable payload.'
+    dependsOn curseForgeJar
+
+    doLast {
+        File jarFile = curseForgeJar.get().archiveFile.get().asFile
+        new ZipFile(jarFile).withCloseable { ZipFile zip ->
+            def forbiddenEntries = zip.entries().toList().findAll { entry ->
+                String name = entry.name.toLowerCase(Locale.ROOT)
+                name.startsWith('native/') || name.endsWith('.exe') || name.endsWith('.dll') || name.endsWith('.so')
+            }
+            if (!forbiddenEntries.isEmpty()) {
+                throw new GradleException("CurseForge distribution contains native payloads: "
+                        + forbiddenEntries.collect { it.name })
+            }
+
+            [
+                    'CURSEFORGE.md',
+                    'META-INF/miguelnetwork/distribution.json',
+                    'META-INF/miguelnetwork/wstunnel-manifest.json',
+                    'META-INF/LICENSE-MiguelNetwork-Apache-2.0.txt',
+                    'META-INF/NOTICE-MiguelNetwork.txt',
+                    'META-INF/licenses/wstunnel-BSD-3-Clause.txt',
+                    'THIRD_PARTY_NOTICES.md'
+            ].each { String entryName ->
+                if (zip.getEntry(entryName) == null) {
+                    throw new GradleException("CurseForge distribution is missing required file ${entryName}")
+                }
+            }
+
+            def descriptor = new JsonSlurper().parse(zip.getInputStream(
+                    zip.getEntry('META-INF/miguelnetwork/distribution.json')))
+            if (descriptor.channel != 'curseforge' || descriptor.bundledWstunnel != false) {
+                throw new GradleException('Invalid CurseForge distribution descriptor')
+            }
+        }
+    }
+}
+
 tasks.named('check').configure {
     dependsOn verifyDistribution
 }

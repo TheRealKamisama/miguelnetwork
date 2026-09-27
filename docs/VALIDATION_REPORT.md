@@ -105,7 +105,7 @@ removes inherited `NO_COLOR` from the child environment and supplies `--no-color
 - Compatibility with SRV redirects and connection-altering Mods.
 - Cleanup after JVM crash or forced termination.
 - Long-duration gameplay, forced network-loss recovery and multi-day memory stability.
-- A fresh 0.2.0 deployment with `legacyFallback = false` proving a complete session fails closed if Discovery becomes
+- A fresh 0.2.1 deployment with `legacyFallback = false` proving a complete session fails closed if Discovery becomes
   unavailable.
 
 ## ATM10 and trusted WSS validation
@@ -155,4 +155,4 @@ The sidecar transport, binary packaging, NeoForge build and chosen central conne
 Status Ping, login and playable sessions have crossed local and trusted public WSS; cross-host and public plain WS have
 also been exercised. The built-in standalone gateway and Discovery-selected raw/ZstdNet routes are now evidenced by
 matching client/server logs. Broader compatibility, abnormal-shutdown cleanup, long-duration stability, and a strict
-Discovery-only 0.2.0 run remain before calling the release production-ready.
+Discovery-only 0.2.1 run remain before calling the release production-ready.

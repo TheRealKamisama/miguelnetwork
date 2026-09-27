@@ -1,6 +1,6 @@
 # Technical validation
 
-This guide describes the 0.2.0 validation workflow. Contributor setup and test
+This guide describes the 0.2.1 validation workflow. Contributor setup and test
 coverage are summarized in [`DEVELOPMENT.md`](DEVELOPMENT.md); installation and
 log interpretation are in [`USER_GUIDE.md`](USER_GUIDE.md).
 

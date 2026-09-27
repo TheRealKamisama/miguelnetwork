@@ -21,6 +21,15 @@ For an offline or pre-downloaded build, place both archives named by the manifes
 binary hashes plus the required MiguelNetwork and wstunnel legal/provenance files. The release filename is
 `miguelnetwork-neoforge-1.21.1-<version>.jar`.
 
+`./gradlew curseForgeJar verifyCurseForgeDistribution --no-daemon` also creates
+`miguelnetwork-neoforge-1.21.1-<version>-curseforge.jar`. That artifact retains the manifest, hashes, licenses, notices,
+and `CURSEFORGE.md`, but contains no `native/**` resource or other executable payload. GitHub Releases receive the
+self-contained JAR; CurseForge receives only the `-curseforge.jar`.
+
+This split does not guarantee CurseForge approval. CurseForge support has explicitly warned that runtime downloading
+may also be rejected and described the transport functionality itself as disallowed. Upload remains gated on new
+written approval or an explicit maintainer decision to accept the rejection risk.
+
 ## GitHub repository configuration
 
 Create a GitHub Actions environment named `curseforge`. Configure it with:
@@ -53,11 +62,13 @@ gh variable set CURSEFORGE_PROJECT_ID --env curseforge --body <numeric-project-i
 1. Complete the third-party release gate in `THIRD_PARTY_LICENSE_AUDIT.md` for the pinned wstunnel build.
 2. Move the current `Unreleased` changelog entries under a heading matching the version in `gradle.properties`.
 3. Run `./gradlew clean build` and test the output on the supported client and dedicated-server platforms.
-4. Create and push an annotated tag exactly matching `v<mod_version>`, for example `v0.2.0`.
+4. Create and push an annotated tag exactly matching `v<mod_version>`, for example `v0.2.1`.
 5. Approve the `curseforge` GitHub environment deployment if protection is enabled.
 
-The tag workflow rejects a version mismatch, performs a clean verified build, creates `SHA256SUMS`, generates a GitHub
-artifact provenance attestation, publishes or updates the GitHub Release assets, and uploads the same JAR to CurseForge.
+The tag workflow rejects a version mismatch, performs a clean verified build, creates `SHA256SUMS` for both artifacts,
+generates a GitHub artifact provenance attestation, publishes or updates the GitHub Release with the bundled JAR, and
+uploads only the separately verified `-curseforge.jar` to CurseForge. The exact CurseForge response is retained as a
+workflow artifact.
 Pre-release labels containing `alpha` or `beta` map to the corresponding CurseForge release type.
 
 If a run fails after CurseForge accepts the file, inspect the CurseForge project before rerunning the job so that a

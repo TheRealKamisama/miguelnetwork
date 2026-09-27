@@ -1,6 +1,6 @@
 # User guide
 
-MiguelNetwork carries Minecraft Java Edition TCP traffic through the bundled
+MiguelNetwork carries Minecraft Java Edition TCP traffic through a pinned and verified
 `wstunnel` sidecar. Install the same MiguelNetwork version on the dedicated server
 and on each client. The current target is Minecraft 1.21.1 and Java 21;
 MiguelNetwork is compiled against NeoForge 21.1.77. Optional ZstdNet 1.4.7/1.4.8
@@ -24,6 +24,26 @@ The complete server and Nginx configuration examples are in
 [`CONFIGURATION.md`](CONFIGURATION.md). Standalone deliberately advertises plain
 WS and does not create certificates. Use `EXTERNAL_PROXY` when TLS/WSS must be
 terminated by Nginx or another gateway.
+
+## Distribution and wstunnel acquisition
+
+The GitHub Release JAR is self-contained and extracts its bundled, verified Windows
+or Linux x86-64 executable. The `-curseforge.jar` contains no native executable.
+For that artifact, either provide an existing executable with
+`-Dmiguelnetwork.wstunnel.path=<path>` or explicitly opt in to the pinned download in
+`config/miguelnetwork-common.toml`:
+
+```toml
+[wstunnelDownload]
+enable = true
+```
+
+The default is `false`. When disabled and no valid external path or bundled binary is
+available, MiguelNetwork makes no download request and leaves its transport inactive.
+When enabled, it downloads only wstunnel 10.7.1 for the current supported platform
+from the official `erebe/wstunnel` GitHub Release, verifies both archive and executable
+SHA-256 values, and atomically caches the result under
+`config/miguelnetwork/runtime/10.7.1/<platform>/`.
 
 ## Client behavior and fallback
 
@@ -88,6 +108,8 @@ fallback indicator.
 
 ## Generated files and common problems
 
+- `config/miguelnetwork-common.toml` contains the explicit CurseForge runtime-download
+  opt-in. It is not required for the bundled GitHub artifact or a valid path override.
 - `config/miguelnetwork/generated/detected-server.toml` records the resolved
   Minecraft/ZstdNet target. It is diagnostic and must not be hand-edited.
 - `config/miguelnetwork/generated/restrictions.yaml` is the server-side wstunnel

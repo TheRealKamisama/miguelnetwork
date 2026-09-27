@@ -86,23 +86,32 @@ jobs:
           echo "game_version_ids=$game_version_ids" >> "$GITHUB_OUTPUT"
       - name: Build and test release
         run: ./gradlew clean build --no-daemon
-      - name: Locate release JAR
-        id: artifact
+      - name: Build and verify CurseForge distribution
+        run: ./gradlew curseForgeJar verifyCurseForgeDistribution --no-daemon
+      - name: Locate and hash release JARs
+        id: artifacts
         shell: bash
         run: |
-          shopt -s nullglob
-          jars=(build/libs/*.jar)
-          if [[ ${#jars[@]} -ne 1 ]]; then
-            echo "Expected exactly one release JAR, found ${#jars[@]}" >&2
+          bundled="build/libs/miguelnetwork-neoforge-1.21.1-${{ steps.version.outputs.version }}.jar"
+          curseforge="build/libs/miguelnetwork-neoforge-1.21.1-${{ steps.version.outputs.version }}-curseforge.jar"
+          [[ -f "$bundled" ]] || { echo "Missing bundled release JAR: $bundled" >&2; exit 1; }
+          [[ -f "$curseforge" ]] || { echo "Missing CurseForge JAR: $curseforge" >&2; exit 1; }
+          echo "bundled_path=$bundled" >> "$GITHUB_OUTPUT"
+          echo "curseforge_path=$curseforge" >> "$GITHUB_OUTPUT"
+          sha256sum "$bundled" "$curseforge" | tee SHA256SUMS
+      - name: Assert CurseForge JAR has no native payload
+        env:
+          CURSEFORGE_JAR: ${{ steps.artifacts.outputs.curseforge_path }}
+        shell: bash
+        run: |
+          if unzip -Z1 "$CURSEFORGE_JAR" | grep -E '(^native/|\.(exe|dll|so)$)'; then
+            echo "CurseForge JAR contains a forbidden native payload" >&2
             exit 1
           fi
-          echo "path=${jars[0]}" >> "$GITHUB_OUTPUT"
-          echo "name=$(basename "${jars[0]}")" >> "$GITHUB_OUTPUT"
-          sha256sum "${jars[0]}" > SHA256SUMS
       - name: Attest release artifact
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: ${{ steps.artifact.outputs.path }}
+          subject-path: ${{ steps.artifacts.outputs.bundled_path }}
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -110,14 +119,14 @@ jobs:
         shell: bash
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${{ steps.artifact.outputs.path }}" SHA256SUMS --clobber
+            gh release upload "$GITHUB_REF_NAME" "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS --clobber
           else
             release_flags=()
             if [[ "$RELEASE_VERSION" == *alpha* || "$RELEASE_VERSION" == *beta* ]]; then
               release_flags+=(--prerelease)
             fi
             gh release create "$GITHUB_REF_NAME" \
-              "${{ steps.artifact.outputs.path }}" SHA256SUMS \
+              "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS \
               --verify-tag \
               --title "MiguelNetwork $RELEASE_VERSION" \
               --generate-notes \
@@ -129,7 +138,7 @@ jobs:
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
           CURSEFORGE_GAME_VERSION_IDS: ${{ steps.curseforge.outputs.game_version_ids }}
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          RELEASE_JAR: ${{ steps.artifact.outputs.path }}
+          RELEASE_JAR: ${{ steps.artifacts.outputs.curseforge_path }}
         shell: bash
         run: |
           release_type=release
@@ -145,7 +154,7 @@ jobs:
               gameVersions: $gameVersions, releaseType: $releaseType}')
           jq -e . <<< "$metadata" >/dev/null
 
-          response_file="$RUNNER_TEMP/curseforge-upload-response.json"
+          response_file="$GITHUB_WORKSPACE/curseforge-upload-response.json"
           set +e
           http_status=$(curl --silent --show-error \
             --output "$response_file" \
@@ -170,3 +179,10 @@ jobs:
           fi
           file_id=$(jq -er '.id | select(type == "number")' "$response_file")
           echo "CurseForge accepted file ID $file_id"
+      - name: Preserve CurseForge upload response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curseforge-upload-response
+          path: curseforge-upload-response.json
+          if-no-files-found: warn

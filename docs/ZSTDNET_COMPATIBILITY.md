@@ -1,6 +1,6 @@
 # ZstdNet compatibility
 
-MiguelNetwork `0.2.0` contains the unilateral compatibility adapter introduced in
+MiguelNetwork `0.2.1` contains the unilateral compatibility adapter introduced in
 alpha.6 for ZstdNet `1.4.7` and `1.4.8` on Minecraft 1.21.1 NeoForge. ZstdNet
 itself and its JAR are not modified, and no Zstd compression code is copied.
 

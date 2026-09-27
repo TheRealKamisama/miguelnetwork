@@ -1,6 +1,6 @@
 # MiguelNetwork Discovery Protocol v1
 
-Status: experimental, implemented by MiguelNetwork `0.2.0` (introduced in alpha.6).
+Status: experimental, implemented by MiguelNetwork `0.2.1` (introduced in alpha.6).
 
 Discovery turns the logical Minecraft address entered by a player into a transport route. It is a control plane only:
 Minecraft and wstunnel stream bytes do not pass through the Discovery document generator. The same public port may be
