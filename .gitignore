@@ -29,3 +29,6 @@ repo
 .agents/
 .codex/
 src/main/resources/native/
+
+# Fabric Loom
+.loom-cache/

@@ -10,7 +10,7 @@ import io.github.therealkamisama.miguelnetwork.core.NativeWstunnel;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
 import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import net.minecraft.server.MinecraftServer;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -38,7 +38,7 @@ public final class ServerTunnelController {
         }
         stop();
         try {
-            Path gameDirectory = FMLPaths.GAMEDIR.get();
+            Path gameDirectory = FabricLoader.getInstance().getGameDir();
             OptionalInt detectedZstdPort = ZstdNetServerCompatibility.discoverListenPort();
             ServerEndpointResolver.ResolvedEndpoints endpoints = ServerEndpointResolver.resolve(
                     gameDirectory, server.getPort(), detectedZstdPort);

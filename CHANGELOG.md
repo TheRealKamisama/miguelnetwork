@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased - Fabric migration
+
+- Add Fabric lifecycle, TOML configuration, production remapping, and client-only Mixins.
+- Gate ZstdNet 1.4.7/1.4.8 APIs before applying optional hooks; preserve raw and compressed Discovery routes.
+- Add configuration/API tests and production-loader byte-stream smoke verification.
+- Keep default standalone unsigned WS, wstunnel 10.7.1, and existing transport behavior.
+
+
 ## Unreleased
 
 - Complete the Forge 1.20.1 / Java 17 build, including bounded gateway workers and concurrent transfer/shutdown tests.

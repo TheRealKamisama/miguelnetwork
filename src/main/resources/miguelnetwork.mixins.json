@@ -4,6 +4,7 @@
   "package": "io.github.therealkamisama.miguelnetwork.mixin",
   "compatibilityLevel": "JAVA_17",
   "refmap": "miguelnetwork.refmap.json",
+  "plugin": "io.github.therealkamisama.miguelnetwork.compat.ZstdNetMixinPlugin",
   "client": [
     "ConnectionMixin",
     "ZstdNetConnectScreenHooksMixin"

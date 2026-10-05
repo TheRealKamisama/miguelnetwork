@@ -4,7 +4,7 @@ import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
-import net.minecraftforge.fml.ModList;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -21,22 +21,23 @@ public final class ZstdNetClientCompatibility {
     }
 
     public static boolean isSupported() {
+        if (!ZstdNetMixinPlugin.isApplied()) return false;
         Boolean cached = supported;
         if (cached != null) {
             return cached;
         }
 
-        boolean result = ModList.get().getModContainerById("zstdnet")
+        boolean result = FabricLoader.getInstance().getModContainer("zstdnet")
                 .map(container -> ZstdNetServerCompatibility.isSupportedVersion(
-                        container.getModInfo().getVersion().toString()))
+                        container.getMetadata().getVersion().getFriendlyString()))
                 .orElse(false);
-        if (ModList.get().isLoaded("zstdnet") && !result) {
-            String version = ModList.get().getModContainerById("zstdnet")
-                    .map(container -> container.getModInfo().getVersion().toString()).orElse("unknown");
+        if (FabricLoader.getInstance().isModLoaded("zstdnet") && !result) {
+            String version = FabricLoader.getInstance().getModContainer("zstdnet")
+                    .map(container -> container.getMetadata().getVersion().getFriendlyString()).orElse("unknown");
             MiguelNetwork.LOGGER.warn("MiguelNetwork ZstdNet client adapter disabled for unsupported version {}", version);
         } else if (result) {
-            String version = ModList.get().getModContainerById("zstdnet")
-                    .map(container -> container.getModInfo().getVersion().toString()).orElse("unknown");
+            String version = FabricLoader.getInstance().getModContainer("zstdnet")
+                    .map(container -> container.getMetadata().getVersion().getFriendlyString()).orElse("unknown");
             MiguelNetwork.LOGGER.info("MiguelNetwork enabled its ZstdNet {} compatibility adapter", version);
         }
         supported = result;
@@ -65,7 +66,8 @@ public final class ZstdNetClientCompatibility {
 
         Object proxy = null;
         try {
-            proxy = startProxy(prepared.get().address(), logicalAddress);
+            proxy = startProxy(prepared.get().address(), logicalAddress,
+                    prepared.get().route().usesFilter(io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol.ZSTDNET_FILTER));
             int localPort = (Integer) proxy.getClass().getMethod("localPort").invoke(proxy);
             ServerAddress localAddress = ServerAddress.parseString("127.0.0.1:" + localPort);
             publishProxyHandle(proxy);
@@ -82,10 +84,10 @@ public final class ZstdNetClientCompatibility {
         } catch (ReflectiveOperationException | RuntimeException exception) {
             closeQuietly(proxy);
             MiguelNetwork.LOGGER.warn(
-                    "MiguelNetwork could not compose the supported ZstdNet adapter; using ZstdNet's original path",
+                    "MiguelNetwork could not compose the supported ZstdNet adapter; refusing the selected route",
                     unwrap(exception)
             );
-            return Optional.empty();
+            throw new IllegalStateException("Cannot compose the selected MiguelNetwork route with ZstdNet", unwrap(exception));
         }
     }
 
@@ -115,11 +117,11 @@ public final class ZstdNetClientCompatibility {
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})
-    private static Object startProxy(InetSocketAddress tunnel, ServerAddress logical)
+    private static Object startProxy(InetSocketAddress tunnel, ServerAddress logical, boolean compressed)
             throws ReflectiveOperationException {
         Class<?> proxyClass = Class.forName(PROXY);
         Class<? extends Enum> modeClass = (Class<? extends Enum>) Class.forName(PROXY + "$Mode").asSubclass(Enum.class);
-        Object zstd = Enum.valueOf(modeClass, "ZSTD");
+        Object zstd = Enum.valueOf(modeClass, compressed ? "ZSTD" : "RAW");
         Class<?> clientConfig = Class.forName("cn.tohsaka.factory.zstdnet.ClientConfig");
         int level = (Integer) clientConfig.getMethod("getLevel").invoke(null);
         Method start = proxyClass.getMethod(

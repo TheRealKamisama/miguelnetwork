@@ -16,7 +16,7 @@ public abstract class ZstdNetConnectScreenHooksMixin {
     @Shadow
     private static volatile boolean bypassing;
 
-    @Inject(method = "interceptConnect", at = @At("HEAD"), cancellable = true, require = 0, remap = false)
+    @Inject(method = "interceptConnect", at = @At("HEAD"), cancellable = true, require = 1, remap = false)
     private static void miguelnetwork$composeZstdNet(
             ServerAddress original,
             ServerData serverData,

@@ -2,23 +2,22 @@ package io.github.therealkamisama.miguelnetwork.config;
 
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
-import net.minecraftforge.common.ForgeConfigSpec;
 
 import java.util.Locale;
 import java.util.Optional;
 
 public final class ClientConfig {
-    public static final ForgeConfigSpec SPEC;
-    private static final ForgeConfigSpec.BooleanValue ENABLED;
-    private static final ForgeConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ForgeConfigSpec.IntValue MAX_TUNNEL_PROCESSES;
-    private static final ForgeConfigSpec.BooleanValue LEGACY_FALLBACK;
-    private static final ForgeConfigSpec.BooleanValue VERIFY_DISCOVERY_SIGNATURES;
-    private static final ForgeConfigSpec.BooleanValue ENFORCE_WSS_DOWNGRADE_PROTECTION;
-    private static final ForgeConfigSpec.BooleanValue VERIFY_TLS_CERTIFICATES;
+    public static final SettingsSpec SPEC;
+    private static final SettingsSpec.BooleanValue ENABLED;
+    private static final SettingsSpec.ConfigValue<String> PATH_PREFIX;
+    private static final SettingsSpec.IntValue MAX_TUNNEL_PROCESSES;
+    private static final SettingsSpec.BooleanValue LEGACY_FALLBACK;
+    private static final SettingsSpec.BooleanValue VERIFY_DISCOVERY_SIGNATURES;
+    private static final SettingsSpec.BooleanValue ENFORCE_WSS_DOWNGRADE_PROTECTION;
+    private static final SettingsSpec.BooleanValue VERIFY_TLS_CERTIFICATES;
 
     static {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        SettingsSpec.Builder builder = new SettingsSpec.Builder();
         builder.comment("MiguelNetwork client-side WebSocket transport settings.");
         ENABLED = builder.comment(
                         "Master client switch. When enabled, endpoints are discovered in WSS, WS, then TCP order.")
