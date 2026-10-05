@@ -2,27 +2,26 @@ package io.github.therealkamisama.miguelnetwork.config;
 
 import io.github.therealkamisama.miguelnetwork.core.MiguelNetworkProtocol;
 import io.github.therealkamisama.miguelnetwork.core.TransportProtocol;
-import net.minecraftforge.common.ForgeConfigSpec;
 
 public final class ServerConfig {
-    public static final ForgeConfigSpec SPEC;
-    private static final ForgeConfigSpec.BooleanValue ENABLED;
-    private static final ForgeConfigSpec.EnumValue<DeploymentMode> MODE;
-    private static final ForgeConfigSpec.ConfigValue<String> BIND_HOST;
-    private static final ForgeConfigSpec.IntValue PUBLIC_PORT;
-    private static final ForgeConfigSpec.ConfigValue<String> PATH_PREFIX;
-    private static final ForgeConfigSpec.BooleanValue DISCOVERY_ENABLED;
-    private static final ForgeConfigSpec.BooleanValue SIGN_DISCOVERY;
-    private static final ForgeConfigSpec.ConfigValue<String> DISCOVERY_BIND_HOST;
-    private static final ForgeConfigSpec.IntValue DISCOVERY_PORT;
-    private static final ForgeConfigSpec.EnumValue<TransportProtocol> ADVERTISED_TRANSPORT;
-    private static final ForgeConfigSpec.ConfigValue<String> ADVERTISED_HOST;
-    private static final ForgeConfigSpec.IntValue ADVERTISED_PORT;
-    private static final ForgeConfigSpec.LongValue DISCOVERY_CONFIG_EPOCH;
-    private static final ForgeConfigSpec.IntValue DISCOVERY_VALIDITY_SECONDS;
+    public static final SettingsSpec SPEC;
+    private static final SettingsSpec.BooleanValue ENABLED;
+    private static final SettingsSpec.EnumValue<DeploymentMode> MODE;
+    private static final SettingsSpec.ConfigValue<String> BIND_HOST;
+    private static final SettingsSpec.IntValue PUBLIC_PORT;
+    private static final SettingsSpec.ConfigValue<String> PATH_PREFIX;
+    private static final SettingsSpec.BooleanValue DISCOVERY_ENABLED;
+    private static final SettingsSpec.BooleanValue SIGN_DISCOVERY;
+    private static final SettingsSpec.ConfigValue<String> DISCOVERY_BIND_HOST;
+    private static final SettingsSpec.IntValue DISCOVERY_PORT;
+    private static final SettingsSpec.EnumValue<TransportProtocol> ADVERTISED_TRANSPORT;
+    private static final SettingsSpec.ConfigValue<String> ADVERTISED_HOST;
+    private static final SettingsSpec.IntValue ADVERTISED_PORT;
+    private static final SettingsSpec.LongValue DISCOVERY_CONFIG_EPOCH;
+    private static final SettingsSpec.IntValue DISCOVERY_VALIDITY_SECONDS;
 
     static {
-        ForgeConfigSpec.Builder builder = new ForgeConfigSpec.Builder();
+        SettingsSpec.Builder builder = new SettingsSpec.Builder();
         builder.comment(
                 "MiguelNetwork dedicated-server settings.",
                 "Minecraft target IP/port come from server.properties; the supported ZstdNet listener is auto-detected."

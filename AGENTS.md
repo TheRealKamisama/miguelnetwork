@@ -2,7 +2,7 @@
 
 ## Project contract
 
-- This branch is a Java 17 Forge mod for Minecraft 1.20.1. It bundles the pinned
+- This branch is a Java 21 Fabric mod for Minecraft 1.21.1. It bundles the pinned
   `wstunnel` 10.7.1 binaries for Windows x86-64 and Linux x86-64.
 - `STANDALONE` is the default server mode: the built-in gateway serves Discovery and
   forwards WebSocket traffic on `server.publicPort`. `EXTERNAL_PROXY` is for Nginx or
@@ -10,10 +10,7 @@
 - Discovery v1 is the normal client control path. The client may use its legacy
   WSS/WS/TCP probe only when Discovery is unavailable and `legacyFallback` is enabled.
   ZstdNet compatibility is intentionally version-gated to 1.4.7 and 1.4.8.
-- MiguelNetwork itself is compiled against Forge 47.1.3. The pinned optional
-  development dependency is ZstdNet 1.4.8 for Forge 1.20.1 (CurseForge file 8752125).
-  Its reflective API has been checked; the inherited 1.4.7 gate is not evidence
-  that a Forge 1.4.7 build has been verified. Never install a NeoForge JAR here.
+- Use Fabric Loader 0.16.10 and Fabric API 0.116.10+1.21.1. ZstdNet Fabric 1.4.7/1.4.8 APIs are pinned and gated. Runtime validation scope is recorded in docs/FABRIC_VALIDATION.md; never install Forge/NeoForge JARs here.
 
 ## Transport and encryption principle
 
@@ -52,19 +49,19 @@ Use the checked-in Gradle wrapper so the Gradle version is reproducible:
 ```text
 .\gradlew.bat test                 # unit tests
 .\gradlew.bat build --no-daemon   # tests plus the distributable JAR
-.\gradlew.bat clean build         # tests, reobfuscation, and distribution checks
+.\gradlew.bat clean build         # tests, remapping, and distribution checks
 ```
 
 On a POSIX shell, use `./gradlew` instead. If dependency resolution fails, record
-the first network/repository error and retry only after checking Java 17,
+the first network/repository error and retry only after checking Java 21,
 `gradle/wrapper/gradle-wrapper.properties`, and the local Gradle cache. Do not
 replace the wrapper with an unpinned system Gradle.
 
 Before hand-off, run `git diff --check`, inspect `git diff`, and record the exact
 artifact path and SHA-256. A successful build produces
-`build/libs/miguelnetwork-forge-1.20.1-<mod_version>.jar`. The `build/devlibs/`
-JAR is not a distribution. `verifyDistribution` checks the reobfuscated JAR's
-Forge metadata, Mixin manifest/refmap, Java 17 bytecode, natives, and notices.
+`build/libs/miguelnetwork-fabric-1.21.1-<mod_version>.jar`. The `build/devlibs/`
+JAR is not a distribution. `verifyDistribution` checks the remapped JAR's
+Fabric metadata, intermediary Mixin refmap, Java 21 bytecode, natives, and notices.
 
 ## Code and documentation rules
 

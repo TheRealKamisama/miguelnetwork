@@ -1,7 +1,7 @@
 package io.github.therealkamisama.miguelnetwork.compat;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
-import net.minecraftforge.fml.ModList;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.lang.reflect.Method;
 import java.util.OptionalInt;
@@ -14,11 +14,11 @@ public final class ZstdNetServerCompatibility {
     }
 
     public static OptionalInt discoverListenPort() {
-        var container = ModList.get().getModContainerById("zstdnet");
+        var container = FabricLoader.getInstance().getModContainer("zstdnet");
         if (container.isEmpty()) {
             return OptionalInt.empty();
         }
-        String version = container.get().getModInfo().getVersion().toString();
+        String version = container.get().getMetadata().getVersion().getFriendlyString();
         if (!isSupportedVersion(version)) {
             MiguelNetwork.LOGGER.warn(
                     "ZstdNet {} is installed, but MiguelNetwork only enables its reflective adapter for [{}]",

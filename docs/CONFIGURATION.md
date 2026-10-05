@@ -3,11 +3,11 @@
 This guide applies to MiguelNetwork 0.2.0. For the shorter installation and
 runtime-log checklist, see [`USER_GUIDE.md`](USER_GUIDE.md).
 
-MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` through Forge.
+MiguelNetwork generates `config/miguelnetwork-server.toml` and `config/miguelnetwork-client.toml` with the embedded TOML configuration adapter. Existing files are read without rewriting; invalid values stop initialization with a diagnostic. Settings are read at startup; restart after changes. The client file is generated only on clients.
 The server configuration is a COMMON config so it is created in the documented top-level `config` directory, not under
 a world's `serverconfig` directory.
 
-On this Java 17 branch, the standalone gateway admits at most 128 simultaneous
+On this Java 21 branch, the standalone gateway admits at most 128 simultaneous
 connections and uses at most 256 daemon workers for both directions. Excess
 connections are closed; the limit includes short-lived Discovery requests.
 
@@ -56,7 +56,7 @@ validitySeconds = 120
 
 Deployment steps:
 
-1. Install Forge, MiguelNetwork and optionally the supported ZstdNet on both client and server.
+1. Install Fabric, MiguelNetwork and optionally the supported ZstdNet on both client and server.
 2. Keep the Minecraft/ZstdNet backend port private; expose TCP `35548` (or the configured `publicPort`) on the firewall
    and NAT it directly to the Minecraft machine.
 3. Start the server. Confirm the log says `standalone WS gateway is ready` and inspect `detected-server.toml`.

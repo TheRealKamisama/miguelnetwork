@@ -2,18 +2,17 @@
 
 MiguelNetwork carries Minecraft Java Edition TCP traffic through the bundled
 `wstunnel` sidecar. Install the same MiguelNetwork version on the dedicated server
-and on each client. This branch targets Minecraft 1.20.1 and Java 17;
-MiguelNetwork is compiled against Forge 47.1.3. Use the Forge 1.20.1 build of
-optional ZstdNet 1.4.8; its reflective API has been checked. The inherited 1.4.7
-allowlist entry has not been separately verified on Forge.
+and on each client. This branch targets Minecraft 1.21.1 and Java 21;
+MiguelNetwork is compiled against Fabric Loader 0.16.10 + Fabric API 0.116.10+1.21.1. Use the Fabric 1.21.1 build of
+optional ZstdNet 1.4.7 or 1.4.8. Both published APIs have been checked; see FABRIC_VALIDATION.md for runtime coverage. Fabric API is required.
 
 ## Quick start: standalone server
 
 Standalone is the default and needs one externally reachable TCP port.
-The Java 17 gateway accepts up to 128 simultaneous connections (including
+The Java 21 gateway accepts up to 128 simultaneous connections (including
 Discovery requests); excess connections are closed until a slot becomes available.
 
-1. Install Forge, MiguelNetwork, and (optionally) a supported ZstdNet on the
+1. Install Fabric, MiguelNetwork, and (optionally) a supported ZstdNet on the
    server and client.
 2. Set the Minecraft `server-ip`/`server-port` in `server.properties`. Keep the
    Minecraft and ZstdNet listener ports private.

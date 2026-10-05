@@ -12,7 +12,7 @@ import io.github.therealkamisama.miguelnetwork.core.WstunnelCommands;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryFilter;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryManifest;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryRoute;
-import net.minecraftforge.fml.loading.FMLPaths;
+import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -59,8 +59,7 @@ public final class ClientTunnelManager {
             return Optional.empty();
         }
         Optional<RoutePlan> selected = resolveRoute(original, true)
-                .filter(route -> !route.tcp()
-                        && route.discoveryRoute().usesFilter(MiguelNetworkProtocol.ZSTDNET_FILTER));
+                .filter(route -> !route.tcp());
         if (selected.isEmpty()) {
             return Optional.empty();
         }
@@ -227,12 +226,12 @@ public final class ClientTunnelManager {
             boolean verifyCertificate = ClientConfig.verifyCertificate();
             if (!route.transport().usesTls() && !unencryptedWarningLogged) {
                 unencryptedWarningLogged = true;
-                MiguelNetwork.LOGGER.warn("MiguelNetwork client selected unencrypted WS; use only on a trusted network");
+                MiguelNetwork.LOGGER.info("MiguelNetwork client selected WS transport");
             } else if (!verifyCertificate && !insecureWarningLogged) {
                 insecureWarningLogged = true;
                 MiguelNetwork.LOGGER.warn("MiguelNetwork TLS certificate verification is disabled (development only)");
             }
-            Path executable = NativeWstunnel.resolve(FMLPaths.GAMEDIR.get());
+            Path executable = NativeWstunnel.resolve(FabricLoader.getInstance().getGameDir());
             started = ManagedWstunnelProcess.start(
                     WstunnelCommands.client(
                             executable, route.host(), route.port(), localPort, route.targetHost(), route.targetPort(),
@@ -257,7 +256,7 @@ public final class ClientTunnelManager {
 
     private static void ensureDiscovery() {
         if (trustStore == null) {
-            Path path = FMLPaths.GAMEDIR.get().resolve("config/miguelnetwork/client-trust.json");
+            Path path = FabricLoader.getInstance().getGameDir().resolve("config/miguelnetwork/client-trust.json");
             trustStore = ClientTrustStore.open(path);
             discoveryService = new ClientDiscoveryService(
                     trustStore, DISCOVERY_TIMEOUT, ClientConfig.verifyDiscoverySignatures());

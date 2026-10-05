@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "${mod_description}",
+  "authors": ["${mod_authors}"],
+  "license": "${mod_license}",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["io.github.therealkamisama.miguelnetwork.MiguelNetwork"],
+    "client": ["io.github.therealkamisama.miguelnetwork.client.MiguelNetworkClient"]
+  },
+  "mixins": [{"config": "miguelnetwork.mixins.json", "environment": "client"}],
+  "depends": {
+    "fabricloader": ">=${loader_version}",
+    "fabric-api": ">=${fabric_api_version}",
+    "minecraft": "=${minecraft_version}",
+    "java": ">=${java_version}"
+  },
+  "suggests": {"zstdnet": "*"}
+}

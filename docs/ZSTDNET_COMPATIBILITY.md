@@ -1,53 +1,37 @@
-# ZstdNet compatibility
+# ZstdNet Fabric compatibility
 
-MiguelNetwork `0.2.0` contains the unilateral compatibility adapter introduced in
-alpha.6 for ZstdNet `1.4.7` and `1.4.8`. This branch targets Minecraft 1.20.1
-Forge. The pinned Forge `1.4.8` dependency (CurseForge file `8752125`) has the
-expected hook fields and reflective methods. The inherited `1.4.7` allowlist
-entry has not been independently verified on Forge; use Forge `1.4.8` here.
-ZstdNet itself and its JAR are not modified, and no Zstd compression code is copied.
+This branch provides a version- and API-gated adapter for ZstdNet Fabric 1.4.7
+and 1.4.8 on Minecraft 1.21.1. Published JAR metadata and bytecode were inspected
+on 2026-09-17. See FABRIC_VALIDATION.md for the actual runtime verification scope;
+API inspection alone does not establish successful gameplay.
 
-## Byte-stream composition
+| MC | ZstdNet | CurseForge file | SHA-256 |
+|---|---|---|---|
+| 1.21.1 | 1.4.7 | 8443113 | 893FC4853A87530CA5F40A8BC387ECE8A424B9D9C3B40E5C8A930B8E61A08667 |
+| 1.21.1 | 1.4.8 | 8752154 | 7EEA2701D4F89CD1CA152950832E281C715C4430C91CB69BE191CB213F7061B9 |
 
-For login traffic, the resulting chain is:
+Source pages: https://www.curseforge.com/minecraft/mc-mods/zstdnet/files/8443113
+and https://www.curseforge.com/minecraft/mc-mods/zstdnet/files/8752154 .
+The JARs require Fabric Loader >=0.16.10, Fabric API, and Java >=21.
 
-```text
-Minecraft client
-  -> ZstdNet client loopback proxy
-  -> MiguelNetwork/wstunnel client loopback listener
-  -> WS or WSS
-  -> wstunnel server
-  -> ZstdNet server listener
-  -> Minecraft backend
-```
+For an advertised compressed route:
+Minecraft -> ZstdNet client proxy -> wstunnel client -> WS/WSS ->
+wstunnel server -> ZstdNet listener -> Minecraft backend.
 
-MiguelNetwork sees and transports only the already-compressed TCP byte stream. Server-list status traffic can select
-the lower-priority raw route and therefore does not require Minecraft packet parsing in MiguelNetwork.
+The Fabric adapter intercepts ZstdNet's own ConnectScreenHooks, preserving its
+UI bypass handling and ProxyHandle ownership. It does not patch the ZstdNet
+JAR or reimplement compression. Original Minecraft handshake host/port remain
+unchanged. Internal loopback connections are marked to prevent double tunnelling.
+For an advertised raw route, the owned proxy uses ZstdNet's RAW mode.
 
-When compatible ZstdNet is loaded on the server, MiguelNetwork reads its public `readListenPort()` API reflectively,
-adds that port to the generated wstunnel restriction, and advertises a higher-priority route with the required
-`zstdnet-stream` filter. A second raw route targets the Minecraft backend, so clients without ZstdNet still have a
-usable MiguelNetwork route.
+Before applying the optional Mixin, bytecode inspection checks the exact hook
+descriptor, bypass flag, handoff fields, proxy factory/modes, and handle methods
+without initializing the target class. Once accepted, the injection is required
+to match; it must not silently fail and advertise unsupported compression.
+A missing or unsupported Mod disables the optional adapter.
 
-On the client, the supported ZstdNet coremod normally creates its loopback proxy before Minecraft reaches
-`Connection.connect`. MiguelNetwork uses an optional pseudo-mixin on ZstdNet's hook class, creates the wstunnel route
-first, invokes ZstdNet's public `LocalZstdNet.start(...)` API reflectively, and publishes the returned handle back to
-ZstdNet so its normal UI/login/logout lifecycle remains responsible for closing it. Injecting into the hook class
-avoids relying on transformation order between ZstdNet's coremod and MiguelNetwork's mixins. The one subsequent
-loopback connection is marked as internal to prevent double tunnelling. ZstdNet's normal server-list UI path reaches
-the hook with its bypass flag set and an already-created loopback proxy; MiguelNetwork restores the logical endpoint
-from `ServerData`, replaces that premature direct proxy, and consumes the bypass flag.
-
-## Version and failure policy
-
-The reflective adapter is enabled only when the installed Mod metadata version is exactly `1.4.7` or `1.4.8` and the
-expected classes, methods and fields are present. This narrow gate is deliberate because ZstdNet exposes no stable
-integration SPI for replacing the upstream address and adopting an externally created `ProxyHandle`.
-
-If a Discovery manifest requires `zstdnet-stream` but the adapter is unavailable, that route is skipped. A compatible
-raw route may still be selected. A manifest with no compatible route fails closed rather than connecting to an
-unadvertised backend. Unknown ZstdNet versions use their original hook and log a compatibility warning; they are not
-claimed as supported until their exact API has been tested.
-
-The only private reflection in the adapter is the narrow handoff to `ConnectScreenHooks.currentProxy` and its
-lock. Compression, framing, status probing, statistics and proxy shutdown continue to be owned by ZstdNet.
+The server discovers readListenPort() reflectively after the default Fabric
+SERVER_STARTED phase. Required unknown filters or unavailable compression are
+never accepted. An advertised raw route may be selected instead; no compatible
+route fails closed. A proxy failure after selecting a route refuses that
+connection instead of falling through to ZstdNet's original direct connection.
