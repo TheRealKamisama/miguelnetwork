@@ -1,0 +1,210 @@
+import groovy.json.JsonSlurper
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.util.zip.ZipFile
+
+def wstunnelManifestFile = file('../src/main/resources/META-INF/miguelnetwork/wstunnel-manifest.json')
+def wstunnelManifest = new JsonSlurper().parse(wstunnelManifestFile)
+def wstunnelOutputDirectory = layout.buildDirectory.dir('generated/wstunnelResources')
+def wstunnelArchiveOverride = providers.gradleProperty('wstunnelArchiveDir')
+
+def sha256 = { InputStream input ->
+    def digest = MessageDigest.getInstance('SHA-256')
+    try (input) {
+        byte[] buffer = new byte[64 * 1024]
+        int read
+        while ((read = input.read(buffer)) >= 0) {
+            digest.update(buffer, 0, read)
+        }
+    }
+    digest.digest().encodeHex().toString()
+}
+
+def prepareWstunnel = tasks.register('prepareWstunnel') {
+    group = 'build'
+    description = 'Downloads, verifies, and stages the pinned upstream wstunnel binaries.'
+
+    inputs.file(wstunnelManifestFile)
+    inputs.property('wstunnelVersion', wstunnelManifest.version)
+    inputs.property('wstunnelPlatforms', wstunnelManifest.platforms.toString())
+    outputs.dir(wstunnelOutputDirectory)
+
+    doLast {
+        File outputDirectory = wstunnelOutputDirectory.get().asFile
+        delete(outputDirectory)
+
+        File cacheDirectory = new File(
+                gradle.gradleUserHomeDir,
+                "caches/miguelnetwork/wstunnel/${wstunnelManifest.version}"
+        )
+        cacheDirectory.mkdirs()
+
+        wstunnelManifest.platforms.each { String platformName, Map metadata ->
+            File archiveFile
+            if (wstunnelArchiveOverride.isPresent()) {
+                archiveFile = new File(project.file(wstunnelArchiveOverride.get()), metadata.archive as String)
+                if (!archiveFile.isFile()) {
+                    throw new GradleException("Missing wstunnel archive in -PwstunnelArchiveDir: ${archiveFile}")
+                }
+            } else {
+                archiveFile = new File(cacheDirectory, metadata.archive as String)
+                if (!archiveFile.isFile()
+                        || sha256(new FileInputStream(archiveFile)) != metadata.archiveSha256) {
+                    File temporaryFile = new File(cacheDirectory, "${metadata.archive}.tmp")
+                    temporaryFile.delete()
+                    String downloadUrl = "${wstunnelManifest.upstream}/releases/download/v${wstunnelManifest.version}/${metadata.archive}"
+                    logger.lifecycle("Downloading ${downloadUrl}")
+                    def connection = uri(downloadUrl).toURL().openConnection()
+                    connection.connectTimeout = 30_000
+                    connection.readTimeout = 120_000
+                    try (InputStream input = connection.inputStream) {
+                        Files.copy(input, temporaryFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                    }
+                    String temporaryHash = sha256(new FileInputStream(temporaryFile))
+                    if (temporaryHash != metadata.archiveSha256) {
+                        temporaryFile.delete()
+                        throw new GradleException("wstunnel archive SHA-256 mismatch for ${metadata.archive}: "
+                                + "expected ${metadata.archiveSha256}, got ${temporaryHash}")
+                    }
+                    Files.move(temporaryFile.toPath(), archiveFile.toPath(), StandardCopyOption.REPLACE_EXISTING)
+                }
+            }
+
+            String archiveHash = sha256(new FileInputStream(archiveFile))
+            if (archiveHash != metadata.archiveSha256) {
+                throw new GradleException("wstunnel archive SHA-256 mismatch for ${metadata.archive}: "
+                        + "expected ${metadata.archiveSha256}, got ${archiveHash}")
+            }
+
+            String executableName = platformName.startsWith('windows-') ? 'wstunnel.exe' : 'wstunnel'
+            Set<File> candidates = tarTree(resources.gzip(archiveFile)).matching {
+                include executableName
+                include "**/${executableName}"
+            }.files
+            if (candidates.size() != 1) {
+                throw new GradleException("Expected one ${executableName} in ${metadata.archive}, found ${candidates.size()}")
+            }
+
+            File executable = candidates.first()
+            String executableHash = sha256(new FileInputStream(executable))
+            if (executableHash != metadata.binarySha256) {
+                throw new GradleException("wstunnel binary SHA-256 mismatch for ${platformName}: "
+                        + "expected ${metadata.binarySha256}, got ${executableHash}")
+            }
+
+            File target = new File(outputDirectory, "native/${platformName}/${executableName}")
+            target.parentFile.mkdirs()
+            Files.copy(executable.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+        }
+    }
+}
+
+tasks.named('processResources', ProcessResources).configure {
+    dependsOn prepareWstunnel
+
+    from(wstunnelOutputDirectory)
+
+    from('../LICENSE') {
+        into 'META-INF'
+        rename { 'LICENSE-MiguelNetwork-Apache-2.0.txt' }
+    }
+    from('../NOTICE') {
+        into 'META-INF'
+        rename { 'NOTICE-MiguelNetwork.txt' }
+    }
+    from('../LICENSE') {
+        into 'META-INF/licenses'
+        rename { 'gson-Apache-2.0.txt' }
+    }
+}
+
+def verifyDistribution = tasks.register('verifyDistribution') {
+    group = 'verification'
+    description = 'Verifies native binaries and required notices in the distributable Mod JAR.'
+    dependsOn tasks.named('reobfJar')
+
+    doLast {
+        File jarFile = tasks.named('reobfJar').get().archiveFile.get().asFile
+        new ZipFile(jarFile).withCloseable { ZipFile zip ->
+            wstunnelManifest.platforms.each { String platformName, Map metadata ->
+                String executableName = platformName.startsWith('windows-') ? 'wstunnel.exe' : 'wstunnel'
+                String entryName = "native/${platformName}/${executableName}"
+                def entry = zip.getEntry(entryName)
+                if (entry == null) {
+                    throw new GradleException("Distribution is missing ${entryName}")
+                }
+                String actualHash = sha256(zip.getInputStream(entry))
+                if (actualHash != metadata.binarySha256) {
+                    throw new GradleException("Distribution SHA-256 mismatch for ${entryName}: "
+                            + "expected ${metadata.binarySha256}, got ${actualHash}")
+                }
+            }
+
+            [
+                    'META-INF/LICENSE-MiguelNetwork-Apache-2.0.txt',
+                    'META-INF/NOTICE-MiguelNetwork.txt',
+                    'META-INF/licenses/wstunnel-BSD-3-Clause.txt',
+                    'THIRD_PARTY_NOTICES.md',
+                    'META-INF/miguelnetwork/wstunnel-manifest.json'
+            ].each { String entryName ->
+                if (zip.getEntry(entryName) == null) {
+                    throw new GradleException("Distribution is missing required legal or provenance file ${entryName}")
+                }
+            }
+        }
+    }
+}
+
+
+tasks.named('check') { dependsOn 'verifyDistribution' }
+
+def noNativeJar = tasks.register('noNativeJar', Zip) {
+    group = 'build'
+    description = 'Repackages the production-mapped JAR without native payloads.'
+    dependsOn tasks.named('reobfJar')
+    archiveExtension = 'jar'
+    archiveClassifier = 'no-native'
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    // Zip deliberately preserves the production manifest bytes. Rebuilding a Jar
+    // from the mutable development-task manifest made Multi-Release depend on
+    // whether shadowJar happened to execute in this invocation.
+    from({ zipTree(tasks.named('reobfJar').get().archiveFile.get().asFile) }) {
+        exclude 'native/**'
+    }
+    from('../src/curseforge/resources')
+    from('NO_NATIVE.md')
+}
+
+tasks.register('verifyNoNativeDistribution') {
+    group = 'verification'
+    dependsOn noNativeJar
+    doLast {
+        new ZipFile(noNativeJar.get().archiveFile.get().asFile).withCloseable { ZipFile zip ->
+            def forbidden = zip.entries().toList().findAll {
+                it.name.startsWith('native/') || it.name.toLowerCase(Locale.ROOT) ==~ /.*\.(exe|dll|so)$/
+            }
+            if (!forbidden.empty) throw new GradleException('Native payload in no-native JAR')
+            ['NO_NATIVE.md', 'META-INF/miguelnetwork/distribution.json',
+             'META-INF/miguelnetwork/wstunnel-manifest.json', 'mixins.miguelnetwork.refmap.json'].each {
+                if (zip.getEntry(it) == null) throw new GradleException("Missing ${it}")
+            }
+            def descriptor = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('META-INF/miguelnetwork/distribution.json')))
+            if (descriptor.bundledWstunnel != false || descriptor.channel != 'curseforge') {
+                throw new GradleException('Invalid no-native acquisition descriptor')
+            }
+            def manifest = new java.util.jar.Manifest(zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')))
+            if (manifest.mainAttributes.getValue('FMLCorePlugin') != "${modGroup}.bootstrap.MiguelNetworkCore") {
+                throw new GradleException('No-native JAR lost early Mixin bootstrap metadata')
+            }
+            new ZipFile(tasks.named('reobfJar').get().archiveFile.get().asFile).withCloseable { production ->
+                if (!java.util.Arrays.equals(
+                        zip.getInputStream(zip.getEntry('META-INF/MANIFEST.MF')).bytes,
+                        production.getInputStream(production.getEntry('META-INF/MANIFEST.MF')).bytes)) {
+                    throw new GradleException('No-native manifest differs from the production manifest')
+                }
+            }
+        }
+    }
+}
+tasks.named('check') { dependsOn 'verifyNoNativeDistribution' }

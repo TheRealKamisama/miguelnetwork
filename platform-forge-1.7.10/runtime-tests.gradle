@@ -1,0 +1,30 @@
+import com.gtnewhorizons.retrofuturagradle.mcp.ReobfuscatedJar
+
+// A separate test mod. Never included in either distributable MiguelNetwork JAR.
+sourceSets {
+    runtimeProbe {
+        compileClasspath += sourceSets.main.compileClasspath + sourceSets.main.output
+        runtimeClasspath += compileClasspath
+    }
+}
+def probeJar = tasks.register('runtimeProbeJar', Jar) {
+    archiveBaseName = 'miguelnetwork-runtime-probe'
+    archiveClassifier = 'dev'
+    destinationDirectory = layout.buildDirectory.dir('runtimeProbe')
+    from sourceSets.runtimeProbe.output
+}
+tasks.register('reobfRuntimeProbe', ReobfuscatedJar) {
+    def modReobf = tasks.named('reobfJar', ReobfuscatedJar)
+    inputJar = probeJar.flatMap { it.archiveFile }
+    archiveBaseName = 'miguelnetwork-runtime-probe'
+    archiveClassifier = ''
+    destinationDirectory = layout.buildDirectory.dir('runtimeProbe')
+    mcVersion = modReobf.flatMap { it.mcVersion }
+    srg = modReobf.flatMap { it.srg }
+    fieldCsv = modReobf.flatMap { it.fieldCsv }
+    methodCsv = modReobf.flatMap { it.methodCsv }
+    exceptorCfg = modReobf.flatMap { it.exceptorCfg }
+    recompMcJar = modReobf.flatMap { it.recompMcJar }
+    extraSrgEntries = []
+    referenceClasspath.from(sourceSets.runtimeProbe.compileClasspath)
+}

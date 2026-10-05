@@ -1,0 +1,41 @@
+import java.util.Properties
+
+def sourceVersion = new Properties()
+file('../gradle.properties').withInputStream { sourceVersion.load(it) }
+project.ext.modVersion = sourceVersion.getProperty('mod_version')
+project.version = project.ext.modVersion
+
+// GTNHGradle 2.0.33 ToolchainModule selects 25 for MODERN; assert the contract.
+assert java.toolchain.languageVersion.get().asInt() == 25
+java.toolchain.vendor = JvmVendorSpec.AZUL
+tasks.withType(JavaCompile).configureEach {
+    if (!(name in ['compileMcLauncherJava', 'compilePatchedMcJava'])) {
+        options.release = 25
+    }
+}
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(25)
+        vendor = JvmVendorSpec.AZUL
+    }
+}
+dependencies {
+    shadowImplementation('com.google.code.gson:gson:2.13.2') { transitive = false }
+    testImplementation platform('org.junit:junit-bom:5.11.0')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+tasks.named('shadowJar') {
+    relocate 'com.google.gson', 'io.github.therealkamisama.miguelnetwork.internal.gson'
+    exclude 'module-info.class', 'META-INF/versions/**'
+}
+// GTNH's separate-Mixin convention adds resources through both allSource and resources.
+tasks.named('sourcesJar') { duplicatesStrategy = DuplicatesStrategy.EXCLUDE }
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+apply from: 'native.gradle'
+

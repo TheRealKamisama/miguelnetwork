@@ -1,0 +1,17 @@
+{
+  "version": "10.7.1",
+  "tagCommit": "d0f1e1ac3f340653a856e7aad66b886c59bf6e8e",
+  "upstream": "https://github.com/erebe/wstunnel",
+  "platforms": {
+    "windows-x86_64": {
+      "archive": "wstunnel_10.7.1_windows_amd64.tar.gz",
+      "archiveSha256": "deb3c8b8d9fecf5428f7e0caabbc13aeb3b1edbfba49e1724a7a065c027bd0f2",
+      "binarySha256": "42fddace83154e7a96205a9f31af5221dbfc442dc56bcf70230ba55fe4af2f2a"
+    },
+    "linux-x86_64": {
+      "archive": "wstunnel_10.7.1_linux_amd64.tar.gz",
+      "archiveSha256": "fa842ed53fbb14b1c69cd98829f9895d7f8a6b0d562c57c1175851a52cea9ea2",
+      "binarySha256": "628143a837e35e8dcbda032bc1e2b07937412bc69e2344b9b583c3acfef8431d"
+    }
+  }
+}

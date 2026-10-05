@@ -1,0 +1,1 @@
+[{"modid":"${modId}","name":"${modName}","description":"Discovery and WebSocket transport for Forge 1.7.10 on Java 25.","version":"${modVersion}","mcversion":"${minecraftVersion}","authorList":["therealkamisama"]}]

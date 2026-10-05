@@ -1,0 +1,48 @@
+{
+  "sourceBaseline": "71da552d24b58227390a2f9aa5de6c36e122fbfd",
+  "starterRevision": "6453dec5f5f534e604887d3505ddf7125889c6f9",
+  "gtnhGradleRevision": "15c83faa7b086dba4b0efcf2212011b84dbade4c",
+  "gradle": "9.7.1",
+  "gtnhGradle": "2.0.33",
+  "retroFuturaGradle": "2.0.5",
+  "minecraft": "1.7.10",
+  "forge": "10.13.4.1614",
+  "mappings": "stable_12",
+  "retroFuturaBootstrap": "1.1.1",
+  "mixin": "0.15.6+mixin.0.8.7",
+  "unimixinsAsm": "9.9.1",
+  "forgePatchesAsm": "9.10.1",
+  "gsonRelocated": "2.13.2",
+  "assets": [
+    {
+      "name": "starter",
+      "url": "https://github.com/GTNewHorizons/ExampleMod1.7.10/releases/download/master-packages/starter.zip",
+      "sha256": "0e1bb6482eb16e391927900bca30fd03dbe256845dcd586bc19b61413b22e673"
+    },
+    {
+      "name": "lwjgl3ify",
+      "url": "https://github.com/GTNewHorizons/lwjgl3ify/releases/download/3.0.33/lwjgl3ify-3.0.33.jar",
+      "sha256": "e6763321e86d2f82685adbe33f02fe9a090029d39b9ac1f0ce6928477cdbd673"
+    },
+    {
+      "name": "lwjgl3ify-forgePatches",
+      "url": "https://github.com/GTNewHorizons/lwjgl3ify/releases/download/3.0.33/lwjgl3ify-3.0.33-forgePatches.jar",
+      "sha256": "d45b9ddb69cb2976a5fae3d640625bda6d41d51095d47f1ce08e18578ec962de"
+    },
+    {
+      "name": "lwjgl3ify-multimc",
+      "url": "https://github.com/GTNewHorizons/lwjgl3ify/releases/download/3.0.33/lwjgl3ify-3.0.33-multimc.zip",
+      "sha256": "7a71e04f0dd2df84816ca6d7c79625f7f5a8b4ec8e6c90cc3f2865ac591279bd"
+    },
+    {
+      "name": "unimixins",
+      "url": "https://nexus.gtnewhorizons.com/repository/public/io/github/legacymoddingmc/unimixins/0.3.1/unimixins-0.3.1.jar",
+      "sha256": "bc699b253bd6a26b56fd898e733bca682ab1b1c7dd3ae586eccbc196dd973197"
+    },
+    {
+      "name": "java25-windows",
+      "url": "https://cdn.azul.com/zulu/bin/zulu25.36.205-ca-jdk25.0.4.1-win_x64.zip",
+      "sha256": "5e91bc55aaa08750370d60b7030bb79193901ce1e93aba31becbf78c3ade5826"
+    }
+  ]
+}

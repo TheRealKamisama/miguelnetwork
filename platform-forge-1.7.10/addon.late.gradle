@@ -1,0 +1,28 @@
+// Use the supported modern launcher without requiring JetBrains' optional HotSwap VM.
+// Minimal Forge runtime: Hodgepodge is recommended for other mods, not required
+// by MiguelNetwork or LWJGL3ify. Keep its unrelated modpack dependencies optional.
+configurations.java17Dependencies.dependencies.removeAll {
+    it.group == 'com.github.GTNewHorizons' && it.name == 'Hodgepodge'
+}
+tasks.named('setupHotswapAgent25') { onlyIf { false } }
+['runClient25', 'runServer25'].each { runName ->
+    tasks.named(runName) {
+        javaLauncher = javaToolchains.launcherFor {
+            languageVersion = JavaLanguageVersion.of(25)
+            vendor = JvmVendorSpec.AZUL
+        }
+        enableHotswap = false
+    }
+}
+
+// UniMixins 0.3.1 shaded ASM omits its implementation version and cannot enable
+// JAVA_25 compatibility. Only the tiny injection bridge targets Java 8. The mod
+// implementation still compiles with --release 25 and requires a Java 25 runtime.
+tasks.named('compileMixinsJava', JavaCompile) {
+    options.release = 8
+    sourceCompatibility = '8'
+    targetCompatibility = '8'
+}
+
+apply from: 'runtime-tests.gradle'
+apply from: 'verification.gradle'

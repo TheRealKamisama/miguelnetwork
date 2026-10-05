@@ -1,0 +1,70 @@
+import groovy.json.JsonSlurper
+import java.util.zip.ZipFile
+
+tasks.register('verifyPlatform') {
+    group = 'verification'
+    description = 'Checks production metadata, bytecode, relocation and Mixin mapping.'
+    dependsOn 'reobfJar'
+    doLast {
+        new ZipFile(tasks.named('reobfJar').get().archiveFile.get().asFile).withCloseable { zip ->
+            def entries = zip.entries().toList()
+            def ownClasses = entries.findAll { it.name.startsWith('io/github/therealkamisama/miguelnetwork/') &&
+                    !it.name.contains('/internal/') && it.name.endsWith('.class') }
+            if (ownClasses.empty) throw new GradleException('No mod classes in production JAR')
+            ownClasses.each { entry ->
+                byte[] bytes = zip.getInputStream(entry).bytes
+                int major = ((bytes[6] & 255) << 8) | (bytes[7] & 255)
+                int expected = entry.name.contains('/mixin/') ? 52 : 69
+                if (major != expected) throw new GradleException("${entry.name}: bytecode ${major}, expected ${expected}")
+                if (new String(bytes, java.nio.charset.StandardCharsets.ISO_8859_1).contains('net/neoforged/')) {
+                    throw new GradleException("NeoForge reference in ${entry.name}")
+                }
+            }
+            if (entries.any { it.name.startsWith('com/google/gson/') || it.name.contains('/probe/') ||
+                    it.name.contains('ZstdNet') || it.name == 'META-INF/neoforge.mods.toml' }) {
+                throw new GradleException('Unrelocated Gson, test driver, ZstdNet adapter or NeoForge metadata in JAR')
+            }
+            if (zip.getEntry('io/github/therealkamisama/miguelnetwork/internal/gson/Gson.class') == null) {
+                throw new GradleException('Relocated Gson missing')
+            }
+            def info = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('mcmod.info')))[0]
+            if (info.mcversion != '1.7.10' || info.version != project.version.toString()) {
+                throw new GradleException('Incorrect platform or version metadata')
+            }
+            def refmap = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('mixins.miguelnetwork.refmap.json')))
+            def mapping = refmap.data.searge['io/github/therealkamisama/miguelnetwork/mixin/NetworkManagerMixin']
+            if (mapping['provideLanClient(Ljava/net/InetAddress;I)Lnet/minecraft/network/NetworkManager;'] !=
+                    'Lnet/minecraft/network/NetworkManager;func_150726_a(Ljava/net/InetAddress;I)Lnet/minecraft/network/NetworkManager;') {
+                throw new GradleException('Missing or incorrect production networking refmap')
+            }
+            def expectedMappings = [
+                'NetworkManagerMixin': [
+                    'getExitMessage()Lnet/minecraft/util/IChatComponent;':
+                        'Lnet/minecraft/network/NetworkManager;func_150730_f()Lnet/minecraft/util/IChatComponent;'
+                ],
+                'GuiConnectingMixin': [
+                    'actionPerformed(Lnet/minecraft/client/gui/GuiButton;)V':
+                        'Lnet/minecraft/client/multiplayer/GuiConnecting;func_146284_a(Lnet/minecraft/client/gui/GuiButton;)V',
+                    'func_146367_a(Ljava/lang/String;I)V':
+                        'Lnet/minecraft/client/multiplayer/GuiConnecting;func_146367_a(Ljava/lang/String;I)V'
+                ],
+                'OldServerPingerMixin': [
+                    'func_147224_a(Lnet/minecraft/client/multiplayer/ServerData;)V':
+                        'Lnet/minecraft/client/network/OldServerPinger;func_147224_a(Lnet/minecraft/client/multiplayer/ServerData;)V',
+                    'func_147225_b(Lnet/minecraft/client/multiplayer/ServerData;)V':
+                        'Lnet/minecraft/client/network/OldServerPinger;func_147225_b(Lnet/minecraft/client/multiplayer/ServerData;)V'
+                ]
+            ]
+            expectedMappings.each { klass, expected ->
+                def actual = refmap.data.searge["io/github/therealkamisama/miguelnetwork/mixin/${klass}"]
+                expected.each { source, target ->
+                    if (actual == null || actual[source] != target) {
+                        throw new GradleException("Missing or incorrect production mapping: ${klass}.${source}")
+                    }
+                }
+            }
+            logger.lifecycle("Verified ${ownClasses.size()} platform classes, Java 25 implementation, Java 8 Mixin bridge and SRG target")
+        }
+    }
+}
+tasks.named('check') { dependsOn 'verifyPlatform' }
