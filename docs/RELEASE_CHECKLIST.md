@@ -1,5 +1,7 @@
 # Fabric release checklist
 
+> Current release policy: [GitHub + CurseForge dual channels](RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 - [ ] Build with the checked-in wrapper; verify tests and remapJar distribution checks.
 - [ ] Check exact Minecraft version, Fabric Loader/API dependency floors, Java
       bytecode, client-only Mixins, intermediary refmap, and absence of Forge metadata.

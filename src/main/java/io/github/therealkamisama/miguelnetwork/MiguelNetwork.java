@@ -1,6 +1,7 @@
 package io.github.therealkamisama.miguelnetwork;
 
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
+import io.github.therealkamisama.miguelnetwork.config.WstunnelDownloadConfig;
 import io.github.therealkamisama.miguelnetwork.server.ServerTunnelController;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -16,6 +17,7 @@ public final class MiguelNetwork implements ModInitializer {
 
     @Override
     public void onInitialize() {
+        WstunnelDownloadConfig.SPEC.load(FabricLoader.getInstance().getConfigDir().resolve("miguelnetwork-common.toml"));
         ServerConfig.SPEC.load(FabricLoader.getInstance().getConfigDir().resolve("miguelnetwork-server.toml"));
         // ZstdNet opens its listener in the default SERVER_STARTED phase.
         ResourceLocation gatewayPhase = ResourceLocation.fromNamespaceAndPath(MOD_ID, "gateway");

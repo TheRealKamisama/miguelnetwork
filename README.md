@@ -1,5 +1,7 @@
 > Fabric migration preview: Java 21 / Minecraft 1.21.1. Fabric API is required. See [verification](docs/FABRIC_VALIDATION.md) for tested scope; historical Forge/NeoForge reports do not establish Fabric runtime support.
 
+> Current release policy: [GitHub + CurseForge dual channels](docs/RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 # MiguelNetwork
 
 > **Short description / 简短介绍**
