@@ -1,5 +1,7 @@
 # Fabric release preparation
 
+> Current release policy: [GitHub + CurseForge dual channels](RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 Use the checked-in wrapper with Java 21 to launch Gradle and a Java 17 target
 toolchain. Run `./gradlew clean build --no-daemon`, then validate the production
 `build/libs/miguelnetwork-fabric-1.20.1-<mod_version>.jar`.

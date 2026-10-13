@@ -22,7 +22,7 @@ class NativeWstunnelTest {
         assertTrue(Files.isRegularFile(first));
         assertEquals(first, second);
         assertEquals(firstHash, NativeWstunnel.sha256(second));
-        assertTrue(first.toString().contains(NativeWstunnel.VERSION));
+        assertTrue(first.toString().contains(WstunnelManifest.load().version()));
     }
 }
 

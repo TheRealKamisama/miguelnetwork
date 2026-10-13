@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased - dual-channel distributions
+
+- Standardize GitHub bundled and CurseForge native-free production distributions across maintained branches.
+- Port the pinned, opt-in runtime wstunnel acquisition policy to each loader and verify both channels during `check`.
+- Preserve production mappings, manifests, dependencies and notices when generating CurseForge artifacts.
+- Use platform/branch-specific release tags and remove the `codex/` branch-name prefix.
+
 ## Unreleased - Fabric migration
 
 - Add Fabric lifecycle, TOML configuration, production remapping, and client-only Mixins.

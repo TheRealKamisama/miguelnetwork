@@ -26,9 +26,12 @@ run-data
 repo
 
 *.log
+*.log.gz
 .agents/
 .codex/
 src/main/resources/native/
 
 # Fabric Loom
 .loom-cache/
+
+curseforge-upload-response.json

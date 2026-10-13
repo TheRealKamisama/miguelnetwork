@@ -234,3 +234,8 @@ tasks.register('exportSmokeClasspath') {
                 configurations.runtimeClasspath.files.collect { it.absolutePath }.join('\n')
     }
 }
+
+// Dual-channel distribution policy; preserve the platform's production mapping.
+ext.releaseProductionTask = 'remapJar'
+ext.releaseProductionFile = tasks.named('remapJar').flatMap { it.archiveFile }
+apply from: 'gradle/dual-channel.gradle'

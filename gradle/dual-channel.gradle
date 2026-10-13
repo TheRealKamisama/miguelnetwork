@@ -1,0 +1,58 @@
+import groovy.json.JsonSlurper
+import java.util.zip.ZipFile
+
+// Always repackage the verified production artifact, never named/dev bytecode.
+def production = tasks.named(project.ext.releaseProductionTask)
+def productionFile = project.ext.releaseProductionFile
+def forbidden = { String name ->
+    String lower = name.toLowerCase(Locale.ROOT)
+    lower == 'native' || lower.startsWith('native/') || lower ==~ /.*\.(exe|dll|so)$/
+}
+def curseForgeJar = tasks.register('curseForgeJar', Zip) {
+    group = 'build'
+    description = 'Builds the CurseForge channel from the production JAR without native binaries.'
+    dependsOn production
+    archiveFileName = productionFile.map { it.asFile.name.replaceFirst(/\.jar$/, '-curseforge.jar') }
+    destinationDirectory = layout.buildDirectory.dir('libs')
+    duplicatesStrategy = DuplicatesStrategy.FAIL
+    includeEmptyDirs = false
+    from({ zipTree(productionFile.get().asFile) }) {
+        exclude { details -> forbidden(details.path) || details.path == 'CURSEFORGE.md' ||
+                details.path == 'META-INF/miguelnetwork/distribution.json' }
+    }
+    from('CURSEFORGE.md')
+    from('src/curseforge/resources')
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+tasks.register('verifyCurseForgeDistribution') {
+    group = 'verification'
+    description = 'Checks native exclusion and byte-for-byte preservation of production classes and metadata.'
+    dependsOn curseForgeJar, tasks.named('verifyDistribution')
+    doLast {
+        new ZipFile(curseForgeJar.get().archiveFile.get().asFile).withCloseable { zip ->
+            def entries = zip.entries().toList()
+            if (entries.any { forbidden(it.name) }) throw new GradleException('Native payload in CurseForge JAR')
+            if (entries.collect { it.name }.toSet().size() != entries.size())
+                throw new GradleException('Duplicate entries in CurseForge JAR')
+            ['CURSEFORGE.md', 'META-INF/miguelnetwork/distribution.json',
+             'META-INF/miguelnetwork/wstunnel-manifest.json',
+             'META-INF/LICENSE-MiguelNetwork-Apache-2.0.txt', 'META-INF/NOTICE-MiguelNetwork.txt',
+             'META-INF/licenses/wstunnel-BSD-3-Clause.txt', 'THIRD_PARTY_NOTICES.md'].each {
+                if (zip.getEntry(it) == null) throw new GradleException("Missing ${it}")
+            }
+            def descriptor = new JsonSlurper().parse(zip.getInputStream(zip.getEntry('META-INF/miguelnetwork/distribution.json')))
+            if (descriptor.channel != 'curseforge' || descriptor.bundledWstunnel != false)
+                throw new GradleException('Invalid CurseForge acquisition descriptor')
+            new ZipFile(productionFile.get().asFile).withCloseable { bundled ->
+                bundled.entries().toList().findAll { !it.directory && !forbidden(it.name) &&
+                    !(it.name in ['CURSEFORGE.md', 'META-INF/miguelnetwork/distribution.json']) }.each { original ->
+                    def copy = zip.getEntry(original.name)
+                    if (copy == null || !Arrays.equals(bundled.getInputStream(original).bytes, zip.getInputStream(copy).bytes))
+                        throw new GradleException("CurseForge JAR changed production entry ${original.name}")
+                }
+            }
+        }
+    }
+}
+tasks.named('check') { dependsOn 'verifyCurseForgeDistribution' }

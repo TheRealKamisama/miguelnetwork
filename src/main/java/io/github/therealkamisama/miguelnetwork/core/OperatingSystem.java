@@ -27,7 +27,7 @@ public enum OperatingSystem {
         String arch = System.getProperty("os.arch", "").toLowerCase(Locale.ROOT);
         boolean x64 = arch.equals("amd64") || arch.equals("x86_64");
         if (!x64) {
-            throw new IllegalStateException("MiguelNetwork Phase 0 only supports x86_64, found: " + arch);
+            throw new IllegalStateException("MiguelNetwork supports wstunnel only on x86_64, found: " + arch);
         }
         if (os.contains("win")) {
             return WINDOWS_X86_64;
@@ -35,7 +35,6 @@ public enum OperatingSystem {
         if (os.contains("linux")) {
             return LINUX_X86_64;
         }
-        throw new IllegalStateException("MiguelNetwork Phase 0 does not support OS: " + os);
+        throw new IllegalStateException("MiguelNetwork does not support wstunnel on OS: " + os);
     }
 }
-
