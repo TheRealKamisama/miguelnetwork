@@ -26,6 +26,9 @@ run-data
 repo
 
 *.log
+*.log.gz
 .agents/
 .codex/
 src/main/resources/native/
+
+curseforge-upload-response.json

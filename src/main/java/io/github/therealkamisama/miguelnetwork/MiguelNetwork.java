@@ -4,6 +4,7 @@ import com.mojang.logging.LogUtils;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
+import io.github.therealkamisama.miguelnetwork.config.WstunnelDownloadConfig;
 import io.github.therealkamisama.miguelnetwork.server.ServerTunnelController;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.common.MinecraftForge;
@@ -24,6 +25,7 @@ public final class MiguelNetwork {
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public MiguelNetwork() {
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, WstunnelDownloadConfig.SPEC, "miguelnetwork-common.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, ClientConfig.SPEC, "miguelnetwork-client.toml");
         // COMMON configs are materialized in config/. Forge SERVER configs live under a world's serverconfig
         // directory, which made the documented dedicated-server file appear to be missing.

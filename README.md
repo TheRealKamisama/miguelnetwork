@@ -1,5 +1,7 @@
 # MiguelNetwork
 
+> Current release policy: [GitHub + CurseForge dual channels](docs/RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 > **Short description / 简短介绍**
 > Carry Minecraft TCP over WebSocket with a bundled Rust wstunnel sidecar and a one-port standalone gateway. Mitigates raw-TCP QoS/blocking; optional proxy-terminated WSS; ZstdNet 1.4.8 Forge.
 > 通过内置 Rust wstunnel sidecar 和单端口 standalone 网关承载 Minecraft TCP，缓解原生 TCP QoS/阻断；可选反代 WSS，兼容 ZstdNet 1.4.8 Forge。

@@ -428,3 +428,8 @@ idea {
         downloadJavadoc = true
     }
 }
+
+// Dual-channel distribution policy; preserve the platform's production mapping.
+ext.releaseProductionTask = 'reobfJar'
+ext.releaseProductionFile = layout.buildDirectory.file("libs/${base.archivesName.get()}-${project.version}.jar")
+apply from: 'gradle/dual-channel.gradle'

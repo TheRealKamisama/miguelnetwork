@@ -1,5 +1,7 @@
 # Release checklist
 
+> Current release policy: [GitHub + CurseForge dual channels](RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 This checklist covers local release preparation and the tag-driven GitHub Actions
 publication flow. It does not itself authorize a commit, tag, push, GitHub login,
 or release publication.

@@ -15,14 +15,20 @@ class NativeWstunnelTest {
 
     @Test
     void extractsAndReusesVerifiedBundledBinary() throws Exception {
-        Path first = NativeWstunnel.resolve(gameDirectory);
+        Path first = resolveBundled();
         String firstHash = NativeWstunnel.sha256(first);
-        Path second = NativeWstunnel.resolve(gameDirectory);
+        Path second = resolveBundled();
 
         assertTrue(Files.isRegularFile(first));
         assertEquals(first, second);
         assertEquals(firstHash, NativeWstunnel.sha256(second));
-        assertTrue(first.toString().contains(NativeWstunnel.VERSION));
+        assertTrue(first.toString().contains(WstunnelManifest.load().version()));
+    }
+
+    private Path resolveBundled() throws Exception {
+        return NativeWstunnel.resolve(gameDirectory, null, OperatingSystem.current(), false,
+                WstunnelManifest.load(), NativeWstunnel.class::getResourceAsStream,
+                (uri, target) -> { throw new AssertionError("Bundled distribution must not download"); });
     }
 }
 
