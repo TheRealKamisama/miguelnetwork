@@ -1,26 +1,197 @@
-name: prepare-cleanroom-release
+name: release
+
 on:
-  workflow_dispatch:
+  push:
+    tags:
+      - "cleanroom-1.12.2-v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
-  contents: read
+  contents: write
+  id-token: write
+  attestations: write
+
 jobs:
-  prepare:
+  release:
     runs-on: ubuntu-latest
+    environment: curseforge
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Java 8 build helper
+        uses: actions/setup-java@v4
         with:
-          distribution: temurin
+          distribution: zulu
+          java-version: "8"
+      - name: Keep Java 8 helper path
+        run: echo "JAVA8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
           java-version: "25"
           cache: gradle
-      - name: Build and verify remapped production JAR
-        run: ./gradlew build --no-daemon
-      - name: Show checksums
-        run: sha256sum build/libs/*-cleanroom-1.12.2-*.jar
-      - uses: actions/upload-artifact@v4
+      - name: Read and validate release version
+        id: version
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#cleanroom-1.12.2-v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { echo "Invalid release version" >&2; exit 1; }
+          ./gradlew verifyReleaseVersion --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME -PreleaseVersion="$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      # Cleanroom runtime requirement is retained in metadata/docs; catalog family is Forge.
+      - name: Validate CurseForge configuration
+        id: curseforge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        shell: bash
+        run: |
+          [[ -n "$CURSEFORGE_API_TOKEN" ]] || { echo "Missing CURSEFORGE_API_TOKEN secret" >&2; exit 1; }
+          [[ "$CURSEFORGE_PROJECT_ID" =~ ^[0-9]+$ ]] || { echo "CURSEFORGE_PROJECT_ID must be numeric" >&2; exit 1; }
+
+          version_catalog="$RUNNER_TEMP/curseforge-game-versions.json"
+          version_types="$RUNNER_TEMP/curseforge-game-version-types.json"
+          curl --fail-with-body --silent --show-error \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            -H "User-Agent: MiguelNetwork GitHub Actions release" \
+            --output "$version_catalog" \
+            "https://minecraft.curseforge.com/api/game/versions"
+          curl --fail-with-body --silent --show-error \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            -H "User-Agent: MiguelNetwork GitHub Actions release" \
+            --output "$version_types" \
+            "https://minecraft.curseforge.com/api/game/version-types"
+          game_version_ids=$(jq -cn \
+            --slurpfile versions "$version_catalog" \
+            --slurpfile types "$version_types" '
+              ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+              [$versions[0][] |
+                ($typeSlug[(.gameVersionTypeID | tostring)] // "") as $type |
+                select(
+                  ($type == "minecraft-1-12" and .name == "1.12.2") or
+                  (($type | startswith("modloader")) and .name == "Forge") or
+                  (($type | startswith("environment")) and (.name == "Client" or .name == "Server"))
+                ) |
+                .id
+              ] | unique
+            ')
+          if ! jq -e 'length == 4 and all(.[]; type == "number")' \
+            <<< "$game_version_ids" >/dev/null; then
+            echo "Expected unique CurseForge entries for Minecraft 1.12.2, Forge, Client, and Server" >&2
+            jq -nr \
+              --slurpfile versions "$version_catalog" \
+              --slurpfile types "$version_types" '
+                ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
+                $versions[0][] |
+                select(.name == "1.12.2" or .name == "Forge" or .name == "Client" or .name == "Server") |
+                [.id, .name, ($typeSlug[(.gameVersionTypeID | tostring)] // "unknown")] | @tsv
+              ' >&2
+            exit 1
+          fi
+          echo "game_version_ids=$game_version_ids" >> "$GITHUB_OUTPUT"
+      - name: Build and test release
+        run: ./gradlew clean build --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME
+      - name: Build and verify CurseForge distribution
+        run: ./gradlew curseForgeJar verifyCurseForgeDistribution --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME
+      - name: Locate and hash release JARs
+        id: artifacts
+        shell: bash
+        run: |
+          bundled="build/libs/miguelnetwork-cleanroom-1.12.2-${{ steps.version.outputs.version }}.jar"
+          curseforge="build/libs/miguelnetwork-cleanroom-1.12.2-${{ steps.version.outputs.version }}-curseforge.jar"
+          [[ -f "$bundled" ]] || { echo "Missing bundled release JAR: $bundled" >&2; exit 1; }
+          [[ -f "$curseforge" ]] || { echo "Missing CurseForge JAR: $curseforge" >&2; exit 1; }
+          echo "bundled_path=$bundled" >> "$GITHUB_OUTPUT"
+          echo "curseforge_path=$curseforge" >> "$GITHUB_OUTPUT"
+          sha256sum "$bundled" "$curseforge" | tee SHA256SUMS
+      - name: Assert CurseForge JAR has no native payload
+        env:
+          CURSEFORGE_JAR: ${{ steps.artifacts.outputs.curseforge_path }}
+        shell: bash
+        run: |
+          if unzip -Z1 "$CURSEFORGE_JAR" | grep -E '(^native/|\.(exe|dll|so)$)'; then
+            echo "CurseForge JAR contains a forbidden native payload" >&2
+            exit 1
+          fi
+      - name: Attest release artifact
+        uses: actions/attest-build-provenance@v3
         with:
-          name: MiguelNetwork-Cleanroom
-          path: |
-            build/libs/*-cleanroom-1.12.2-*.jar
-            !build/libs/*-dev.jar
-          if-no-files-found: error
+          subject-path: ${{ steps.artifacts.outputs.bundled_path }}
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        shell: bash
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS --clobber
+          else
+            release_flags=()
+            if [[ "$RELEASE_VERSION" == *alpha* || "$RELEASE_VERSION" == *beta* ]]; then
+              release_flags+=(--prerelease)
+            fi
+            gh release create "$GITHUB_REF_NAME" \
+              "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS \
+              --verify-tag \
+              --title "MiguelNetwork cleanroom 1.12.2 $RELEASE_VERSION" \
+              --generate-notes \
+              "${release_flags[@]}"
+          fi
+      - name: Publish to CurseForge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_GAME_VERSION_IDS: ${{ steps.curseforge.outputs.game_version_ids }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          RELEASE_JAR: ${{ steps.artifacts.outputs.curseforge_path }}
+        shell: bash
+        run: |
+          release_type=release
+          [[ "$RELEASE_VERSION" == *alpha* ]] && release_type=alpha
+          [[ "$RELEASE_VERSION" == *beta* ]] && release_type=beta
+
+          metadata=$(jq -cn \
+            --arg changelog "$(cat CHANGELOG.md)" \
+            --arg displayName "MiguelNetwork cleanroom 1.12.2 $RELEASE_VERSION" \
+            --arg releaseType "$release_type" \
+            --argjson gameVersions "$CURSEFORGE_GAME_VERSION_IDS" \
+            '{changelog: $changelog, changelogType: "markdown", displayName: $displayName,
+              gameVersions: $gameVersions, releaseType: $releaseType}')
+          jq -e . <<< "$metadata" >/dev/null
+
+          response_file="$GITHUB_WORKSPACE/curseforge-upload-response.json"
+          set +e
+          http_status=$(curl --silent --show-error \
+            --output "$response_file" \
+            --write-out '%{http_code}' \
+            -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+            --form-string "metadata=$metadata" \
+            -F "file=@$RELEASE_JAR;type=application/java-archive" \
+            "https://minecraft.curseforge.com/api/projects/$CURSEFORGE_PROJECT_ID/upload-file")
+          curl_status=$?
+          set -e
+
+          if [[ -s "$response_file" ]]; then
+            jq . "$response_file" 2>/dev/null || cat "$response_file"
+          fi
+          if [[ $curl_status -ne 0 ]]; then
+            echo "CurseForge upload transport failed with curl exit code $curl_status" >&2
+            exit "$curl_status"
+          fi
+          if [[ "$http_status" != 200 && "$http_status" != 201 ]]; then
+            echo "CurseForge upload failed with HTTP $http_status" >&2
+            exit 1
+          fi
+          file_id=$(jq -er '.id | select(type == "number")' "$response_file")
+          echo "CurseForge accepted file ID $file_id"
+      - name: Preserve CurseForge upload response
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curseforge-upload-response
+          path: curseforge-upload-response.json
+          if-no-files-found: warn

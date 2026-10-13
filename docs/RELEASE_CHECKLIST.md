@@ -1,5 +1,7 @@
 # Cleanroom release gates
 
+> Current release policy: [GitHub + CurseForge dual channels](RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 - Pin Minecraft 1.12.2, the tested Cleanroom version, Java 25, wrapper, mappings and Unimined.
 - Run the checked-in wrapper `clean build`; tests and production distribution checks must pass.
 - Check the remapped JAR's metadata, Java bytecode, Mixin registration/mapping, relocated configuration library,
