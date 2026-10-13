@@ -320,3 +320,8 @@ tasks.withType(AbstractArchiveTask).configureEach {
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
 }
+
+// Dual-channel distribution policy; preserve the platform's production mapping.
+ext.releaseProductionTask = 'remapShadowJar'
+ext.releaseProductionFile = tasks.named('remapShadowJar').flatMap { it.archiveFile }
+apply from: 'gradle/dual-channel.gradle'

@@ -3,6 +3,7 @@ package io.github.therealkamisama.miguelnetwork;
 import io.github.therealkamisama.miguelnetwork.client.ClientTunnelManager;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.config.ServerConfig;
+import io.github.therealkamisama.miguelnetwork.config.WstunnelDownloadConfig;
 import io.github.therealkamisama.miguelnetwork.server.ServerTunnelController;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.Mod;
@@ -26,6 +27,7 @@ public final class MiguelNetwork {
     public void preInit(FMLPreInitializationEvent event) {
         Path config = event.getModConfigurationDirectory().toPath().toAbsolutePath();
         gameDirectory = config.getParent();
+        WstunnelDownloadConfig.SPEC.load(config.resolve("miguelnetwork-common.toml"));
         ServerConfig.SPEC.load(config.resolve("miguelnetwork-server.toml"));
         if (event.getSide().isClient()) {
             ClientConfig.SPEC.load(config.resolve("miguelnetwork-client.toml"));

@@ -5,9 +5,12 @@ build/
 run/
 out/
 *.log
+*.log.gz
 
 # Local coding-agent state; repository instructions belong in AGENTS.md.
 .agents/
 .codex/
 
 src/main/resources/native/
+
+curseforge-upload-response.json

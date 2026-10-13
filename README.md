@@ -1,5 +1,7 @@
 # MiguelNetwork — Cleanroom 1.12.2
 
+> Current release policy: [GitHub + CurseForge dual channels](docs/RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 本分支正在将 MiguelNetwork 0.2.0 移植到 **Minecraft 1.12.2 / Cleanroom 0.6.13-alpha / Java 25**。
 迁移状态和验证限制见 [Cleanroom 迁移记录](docs/CLEANROOM_MIGRATION.md)。旧版 NeoForge 的运行记录不代表本平台已经通过游戏实测。
 
