@@ -1,5 +1,7 @@
 # MiguelNetwork
 
+> Current release policy: [GitHub + CurseForge dual channels](docs/RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 The separate [Forge 1.7.10 / Java 25 platform](platform-forge-1.7.10/README.md)
 has its own build and [validation report](docs/FORGE_1_7_10_JAVA_25_VALIDATION.md).
 The root build remains NeoForge 1.21.1 / Java 21.

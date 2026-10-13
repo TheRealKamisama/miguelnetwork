@@ -1,5 +1,7 @@
 # Configuration and deployment
 
+> Runtime acquisition and distribution settings: see [RELEASE_CHANNELS.md](RELEASE_CHANNELS.md). Download remains disabled by default.
+
 This guide applies to MiguelNetwork 0.2.1. For the shorter installation and
 runtime-log checklist, see [`USER_GUIDE.md`](USER_GUIDE.md).
 

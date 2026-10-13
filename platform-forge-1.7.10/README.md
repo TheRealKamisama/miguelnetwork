@@ -11,7 +11,7 @@ Use the checked-in wrapper from this directory with an Azul Java 25 JDK:
 ```
 
 On POSIX use `./gradlew`. `build` produces the reobfuscated production JAR and
-the no-native distribution. `jar` alone creates an intermediate development JAR;
+the CurseForge distribution (plus the legacy no-native artifact). `jar` alone creates an intermediate development JAR;
 use `reobfJar` for production. Do not install `*-dev*` files in a normal instance.
 
 - [Installation and configuration](../docs/FORGE_1_7_10_JAVA_25_USER_GUIDE.md)
@@ -23,3 +23,5 @@ The runtime acceptance driver under `src/runtimeProbe` is a separate test mod.
 It is never included in the MiguelNetwork distributions. Do not install that
 driver into ordinary player instances: it automatically connects, disconnects,
 and exits the client for testing.
+
+The two publication channels and tag format are documented in [RELEASE_CHANNELS.md](../docs/RELEASE_CHANNELS.md). Use `curseForgeJar verifyCurseForgeDistribution`; the legacy `noNativeJar` task is retained for existing local consumers and is not uploaded by release automation.

@@ -11,3 +11,5 @@ out/
 .codex/
 
 src/main/resources/native/
+
+curseforge-upload-response.json

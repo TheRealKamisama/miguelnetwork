@@ -26,3 +26,15 @@ tasks.named('compileMixinsJava', JavaCompile) {
 
 apply from: 'runtime-tests.gradle'
 apply from: 'verification.gradle'
+
+// Dual-channel distribution policy; preserve the platform's production mapping.
+ext.releaseProductionTask = 'reobfJar'
+ext.releaseProductionFile = tasks.named('reobfJar').flatMap { it.archiveFile }
+apply from: 'gradle/dual-channel.gradle'
+
+tasks.register('verifyReleaseVersion') {
+    doLast {
+        if (providers.gradleProperty('releaseVersion').orNull != project.version.toString())
+            throw new GradleException('Pass the matching -PreleaseVersion=<version>')
+    }
+}

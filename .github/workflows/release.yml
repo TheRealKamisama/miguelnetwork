@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - "v*"
+      - "forge-1.7.10-java25-v*"
 
 concurrency:
   group: release-${{ github.ref }}
@@ -18,21 +18,32 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: curseforge
+    defaults:
+      run:
+        working-directory: platform-forge-1.7.10
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
-      - name: Set up Java 21
+      - name: Set up Java 8 build helper
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: zulu
+          java-version: "8"
+      - name: Keep Java 8 helper path
+        run: echo "JAVA8_HOME=$JAVA_HOME" >> "$GITHUB_ENV"
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: "25"
           cache: gradle
       - name: Read and validate release version
         id: version
         shell: bash
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          ./gradlew verifyReleaseVersion --no-daemon -PreleaseVersion="$version"
+          version="${GITHUB_REF_NAME#forge-1.7.10-java25-v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { echo "Invalid release version" >&2; exit 1; }
+          ./gradlew verifyReleaseVersion --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME -PreleaseVersion="$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Validate CurseForge configuration
         id: curseforge
@@ -63,8 +74,8 @@ jobs:
               [$versions[0][] |
                 ($typeSlug[(.gameVersionTypeID | tostring)] // "") as $type |
                 select(
-                  ($type == "minecraft-1-21" and .name == "1.21.1") or
-                  (($type | startswith("modloader")) and .name == "NeoForge") or
+                  ($type == "minecraft-1-7" and .name == "1.7.10") or
+                  (($type | startswith("modloader")) and .name == "Forge") or
                   (($type | startswith("environment")) and (.name == "Client" or .name == "Server"))
                 ) |
                 .id
@@ -72,39 +83,39 @@ jobs:
             ')
           if ! jq -e 'length == 4 and all(.[]; type == "number")' \
             <<< "$game_version_ids" >/dev/null; then
-            echo "Expected unique CurseForge entries for Minecraft 1.21.1, NeoForge, Client, and Server" >&2
+            echo "Expected unique CurseForge entries for Minecraft 1.7.10, Forge, Client, and Server" >&2
             jq -nr \
               --slurpfile versions "$version_catalog" \
               --slurpfile types "$version_types" '
                 ($types[0] | map({key: (.id | tostring), value: .slug}) | from_entries) as $typeSlug |
                 $versions[0][] |
-                select(.name == "1.21.1" or .name == "NeoForge" or .name == "Client" or .name == "Server") |
+                select(.name == "1.7.10" or .name == "Forge" or .name == "Client" or .name == "Server") |
                 [.id, .name, ($typeSlug[(.gameVersionTypeID | tostring)] // "unknown")] | @tsv
               ' >&2
             exit 1
           fi
           echo "game_version_ids=$game_version_ids" >> "$GITHUB_OUTPUT"
       - name: Build and test release
-        run: ./gradlew clean build --no-daemon
+        run: ./gradlew clean build --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME
       - name: Build and verify CurseForge distribution
-        run: ./gradlew curseForgeJar verifyCurseForgeDistribution --no-daemon
+        run: ./gradlew curseForgeJar verifyCurseForgeDistribution --no-daemon -Porg.gradle.java.installations.fromEnv=JAVA_HOME,JAVA8_HOME
       - name: Locate and hash release JARs
         id: artifacts
         shell: bash
         run: |
-          bundled="build/libs/miguelnetwork-neoforge-1.21.1-${{ steps.version.outputs.version }}.jar"
-          curseforge="build/libs/miguelnetwork-neoforge-1.21.1-${{ steps.version.outputs.version }}-curseforge.jar"
+          bundled="build/libs/miguelnetwork-forge-1.7.10-${{ steps.version.outputs.version }}.jar"
+          curseforge="build/libs/miguelnetwork-forge-1.7.10-${{ steps.version.outputs.version }}-curseforge.jar"
           [[ -f "$bundled" ]] || { echo "Missing bundled release JAR: $bundled" >&2; exit 1; }
           [[ -f "$curseforge" ]] || { echo "Missing CurseForge JAR: $curseforge" >&2; exit 1; }
-          echo "bundled_path=$bundled" >> "$GITHUB_OUTPUT"
-          echo "curseforge_path=$curseforge" >> "$GITHUB_OUTPUT"
+          echo "bundled_path=platform-forge-1.7.10/$bundled" >> "$GITHUB_OUTPUT"
+          echo "curseforge_path=platform-forge-1.7.10/$curseforge" >> "$GITHUB_OUTPUT"
           sha256sum "$bundled" "$curseforge" | tee SHA256SUMS
       - name: Assert CurseForge JAR has no native payload
         env:
           CURSEFORGE_JAR: ${{ steps.artifacts.outputs.curseforge_path }}
         shell: bash
         run: |
-          if unzip -Z1 "$CURSEFORGE_JAR" | grep -E '(^native/|\.(exe|dll|so)$)'; then
+          if unzip -Z1 "$GITHUB_WORKSPACE/$CURSEFORGE_JAR" | grep -E '(^native/|\.(exe|dll|so)$)'; then
             echo "CurseForge JAR contains a forbidden native payload" >&2
             exit 1
           fi
@@ -119,16 +130,16 @@ jobs:
         shell: bash
         run: |
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS --clobber
+            gh release upload "$GITHUB_REF_NAME" "$GITHUB_WORKSPACE/${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS --clobber
           else
             release_flags=()
             if [[ "$RELEASE_VERSION" == *alpha* || "$RELEASE_VERSION" == *beta* ]]; then
               release_flags+=(--prerelease)
             fi
             gh release create "$GITHUB_REF_NAME" \
-              "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS \
+              "$GITHUB_WORKSPACE/${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS \
               --verify-tag \
-              --title "MiguelNetwork $RELEASE_VERSION" \
+              --title "MiguelNetwork forge 1.7.10 $RELEASE_VERSION" \
               --generate-notes \
               "${release_flags[@]}"
           fi
@@ -146,8 +157,8 @@ jobs:
           [[ "$RELEASE_VERSION" == *beta* ]] && release_type=beta
 
           metadata=$(jq -cn \
-            --arg changelog "$(cat CHANGELOG.md)" \
-            --arg displayName "MiguelNetwork $RELEASE_VERSION" \
+            --arg changelog "$(cat ../CHANGELOG.md)" \
+            --arg displayName "MiguelNetwork forge 1.7.10 $RELEASE_VERSION" \
             --arg releaseType "$release_type" \
             --argjson gameVersions "$CURSEFORGE_GAME_VERSION_IDS" \
             '{changelog: $changelog, changelogType: "markdown", displayName: $displayName,
@@ -161,7 +172,7 @@ jobs:
             --write-out '%{http_code}' \
             -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
             --form-string "metadata=$metadata" \
-            -F "file=@$RELEASE_JAR;type=application/java-archive" \
+            -F "file=@$GITHUB_WORKSPACE/$RELEASE_JAR;type=application/java-archive" \
             "https://minecraft.curseforge.com/api/projects/$CURSEFORGE_PROJECT_ID/upload-file")
           curl_status=$?
           set -e

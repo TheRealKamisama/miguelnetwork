@@ -1,38 +1,28 @@
-name: build
-
-on:
-  push:
-    branches:
-      - "**"
-  pull_request:
-  workflow_dispatch:
-
-concurrency:
-  group: build-${{ github.ref }}
-  cancel-in-progress: true
-
+name: Build Forge 1.7.10
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: platform-forge-1.7.10
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
-      - name: Build and test
-        run: ./gradlew build --no-daemon
-      - name: Show distribution checksums
-        run: sha256sum build/libs/*.jar
-      - name: Upload Mod JAR
-        uses: actions/upload-artifact@v4
+          distribution: zulu
+          java-version: |
+            8
+            25
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew build --no-daemon
+      - uses: actions/upload-artifact@v4
         with:
-          name: MiguelNetwork
-          path: build/libs/*.jar
+          name: MiguelNetwork-Forge-1.7.10
+          path: |
+            platform-forge-1.7.10/build/libs/*.jar
+            !platform-forge-1.7.10/build/libs/*-dev*.jar
+            !platform-forge-1.7.10/build/libs/*-sources.jar
           if-no-files-found: error
