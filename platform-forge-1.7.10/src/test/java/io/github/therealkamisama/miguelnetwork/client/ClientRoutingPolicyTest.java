@@ -9,18 +9,38 @@ import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryManifest;
 import io.github.therealkamisama.miguelnetwork.discovery.DiscoveryRoute;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.net.InetSocketAddress;
 import java.time.Instant;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClientRoutingPolicyTest {
+    @TempDir Path directory;
     @AfterEach void cleanup() { ClientTunnelManager.stop(); }
+
+    @Test void optionalZstdHintPreparesPlainTunnelWithoutThePeer() throws Exception {
+        String key = "miguelnetwork.wstunnel.path";
+        String previous = System.setProperty(key,
+                io.github.therealkamisama.miguelnetwork.core.NativeWstunnel.resolve(directory).toString());
+        try (Endpoint endpoint = new Endpoint(MiguelNetworkProtocol.ZSTDNET_FILTER, false, null, 200);
+             var lease = ClientTunnelManager.acquire(endpoint.address())) {
+            assertTrue(lease.tunneled());
+            assertTrue(lease.discovered());
+            assertFalse(lease.filtered(), "An optional hint cannot require an absent compressor");
+            assertNull(lease.stats());
+            assertNotEquals(endpoint.address(), lease.address());
+            endpoint.assertHealthy();
+        } finally {
+            if (previous == null) System.clearProperty(key); else System.setProperty(key, previous);
+        }
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {"unknown", MiguelNetworkProtocol.ZSTDNET_FILTER})
@@ -69,6 +89,10 @@ class ClientRoutingPolicyTest {
         private final AtomicReference<Throwable> failure = new AtomicReference<>();
 
         Endpoint(String filter, byte[] fixedResponse, int status) throws Exception {
+            this(filter, true, fixedResponse, status);
+        }
+
+        Endpoint(String filter, boolean required, byte[] fixedResponse, int status) throws Exception {
             server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
             server.createContext(MiguelNetworkProtocol.DISCOVERY_PATH, exchange -> {
                 try {
@@ -81,7 +105,7 @@ class ClientRoutingPolicyTest {
                                 MiguelNetworkProtocol.DISCOVERY_PROTOCOL, "unsigned", audience, nonce, 1,
                                 now, now + 60, List.of(new DiscoveryRoute("filtered", TransportProtocol.WS,
                                 "127.0.0.1", server.getAddress().getPort(), "miguelnetwork-v1", "127.0.0.1",
-                                25565, 100, List.of(new DiscoveryFilter(filter, 1, true)))), "unsigned"));
+                                25565, 100, List.of(new DiscoveryFilter(filter, 1, required)))), "unsigned"));
                     }
                     exchange.sendResponseHeaders(status, response.length == 0 ? -1 : response.length);
                     exchange.getResponseBody().write(response);

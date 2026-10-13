@@ -24,8 +24,9 @@ are verified, but Linux runtime testing was explicitly excluded and remains unte
 Hodgepodge is recommended by LWJGL3ify for compatibility with other mods. It is
 not required by this minimal MiguelNetwork baseline. Test any additional modpack
 components separately. Hybrid servers such as Thermos/Crucible are outside this
-setup. ZstdNet integration is absent: no adapter or ZstdNet Mixin is packaged,
-and required unsupported Discovery filters are rejected.
+setup. Updated maintained ZstdNet builds support [native interoperability v1](NATIVE_INTEROP_V1.md).
+Install updated builds on both sides. MiguelNetwork carries ZstdNet's compressed stream through the advertised
+`zstdnet-stream` route without cross-mod Mixins or private reflection. Unknown required filters still reject.
 
 ## Client installation
 

@@ -19,11 +19,14 @@ public final class ManagedWstunnelProcess implements AutoCloseable {
     private final Process process;
     private final Thread outputThread;
     private final CompletableFuture<Void> ready;
+    private final java.util.concurrent.CopyOnWriteArrayList<OutputSignal> signals;
 
-    private ManagedWstunnelProcess(Process process, Thread outputThread, CompletableFuture<Void> ready) {
+    private ManagedWstunnelProcess(Process process, Thread outputThread, CompletableFuture<Void> ready,
+                                  java.util.concurrent.CopyOnWriteArrayList<OutputSignal> signals) {
         this.process = process;
         this.outputThread = outputThread;
         this.ready = ready;
+        this.signals = signals;
     }
 
     public static ManagedWstunnelProcess start(
@@ -39,18 +42,21 @@ public final class ManagedWstunnelProcess implements AutoCloseable {
         builder.redirectErrorStream(true);
         Process process = builder.start();
         CompletableFuture<Void> ready = new CompletableFuture<>();
+        var signals = new java.util.concurrent.CopyOnWriteArrayList<OutputSignal>();
         Thread outputThread = new Thread(
-                () -> consumeOutput(process, process.getInputStream(), readinessLine, ready, logger),
+                () -> consumeOutput(process, process.getInputStream(), readinessLine, ready, logger, signals),
                 "MiguelNetwork-wstunnel-log-" + process.pid()
         );
         outputThread.setDaemon(true);
         outputThread.start();
         process.onExit().thenAccept(exited -> {
+            signals.forEach(signal -> signal.future().completeExceptionally(
+                    new IOException("wstunnel exited while waiting for output")));
             if (!ready.isDone()) {
                 ready.completeExceptionally(new IOException("wstunnel exited before becoming ready: " + exited.exitValue()));
             }
         });
-        return new ManagedWstunnelProcess(process, outputThread, ready);
+        return new ManagedWstunnelProcess(process, outputThread, ready, signals);
     }
 
     private static void consumeOutput(
@@ -58,13 +64,17 @@ public final class ManagedWstunnelProcess implements AutoCloseable {
             InputStream stream,
             Predicate<String> readinessLine,
             CompletableFuture<Void> ready,
-            Logger logger
+            Logger logger,
+            java.util.concurrent.CopyOnWriteArrayList<OutputSignal> signals
     ) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(stream, StandardCharsets.UTF_8))) {
             String line;
             while ((line = reader.readLine()) != null) {
                 String safeLine = redact(line);
                 logger.info("[wstunnel:{}] {}", process.pid(), safeLine);
+                signals.forEach(signal -> {
+                    if (signal.matches().test(safeLine)) signal.future().complete(null);
+                });
                 if (!ready.isDone() && readinessLine.test(line)) {
                     ready.complete(null);
                 }
@@ -80,9 +90,39 @@ public final class ManagedWstunnelProcess implements AutoCloseable {
         return line.replaceAll("(?i)(authorization|password|token)([=: ]+)[^ ,;]+", "$1$2<redacted>");
     }
 
+    /** Register before editing restrictions so the reload acknowledgement cannot race the caller. */
+    public CompletableFuture<Void> expectOutput(Predicate<String> matches) {
+        var future = new CompletableFuture<Void>();
+        var signal = new OutputSignal(matches, future);
+        signals.add(signal);
+        future.whenComplete((ignored, failure) -> signals.remove(signal));
+        if (!process.isAlive()) future.completeExceptionally(new IOException("wstunnel is not running"));
+        return future;
+    }
+
+    private record OutputSignal(Predicate<String> matches, CompletableFuture<Void> future) {}
+
     public void awaitReady(Duration timeout) throws IOException {
+        awaitReady(timeout, () -> false);
+    }
+
+    public void awaitReady(Duration timeout, java.util.function.BooleanSupplier cancelled) throws IOException {
+        long deadline = System.nanoTime() + timeout.toNanos();
         try {
-            ready.get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+            while (true) {
+                if (cancelled.getAsBoolean()) throw new java.util.concurrent.CancellationException("Connection cancelled");
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0) throw new TimeoutException();
+                try {
+                    ready.get(Math.min(100, Math.max(1, TimeUnit.NANOSECONDS.toMillis(remaining))), TimeUnit.MILLISECONDS);
+                    return;
+                } catch (TimeoutException waiting) {
+                    if (System.nanoTime() >= deadline) throw waiting;
+                }
+            }
+        } catch (java.util.concurrent.CancellationException cancelledFailure) {
+            close();
+            throw cancelledFailure;
         } catch (TimeoutException exception) {
             close();
             throw new IOException("Timed out waiting for wstunnel readiness", exception);

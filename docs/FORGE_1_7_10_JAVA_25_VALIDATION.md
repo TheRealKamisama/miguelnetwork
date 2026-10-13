@@ -1,5 +1,9 @@
 # Forge 1.7.10 / Java 25 validation
 
+The earlier platform baseline below is historical. Updated maintained ZstdNet
+builds now support the native API; see [current native validation](NATIVE_INTEROP_V1_VALIDATION.md)
+for the accepted artifact hashes, paired Minecraft runs and remaining scope.
+
 Updated 2026-10-04. **Acceptance complete for the agreed Windows scope.** The
 current production JAR passes development and installed client/server loading,
 Discovery/plain-WS gameplay, lifecycle and restart checks, optional signed

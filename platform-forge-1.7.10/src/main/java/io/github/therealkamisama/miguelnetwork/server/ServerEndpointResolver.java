@@ -48,7 +48,7 @@ final class ServerEndpointResolver {
                 + "minecraftTargetHost = \"" + escape(endpoints.targetHost()) + "\"\n"
                 + "minecraftTargetPort = " + endpoints.minecraftPort() + "\n"
                 + "zstdNetDetected = " + (endpoints.zstdNetPort() != null) + "\n"
-                + "zstdNetTargetHost = \"" + escape(endpoints.targetHost()) + "\"\n"
+                + "zstdNetTargetHost = \"" + escape(endpoints.zstdNetHost()) + "\"\n"
                 + "zstdNetTargetPort = " + zstdPort + "\n";
         Files.writeString(output, content, StandardCharsets.UTF_8);
     }
@@ -70,7 +70,21 @@ final class ServerEndpointResolver {
             String configuredServerIp,
             String targetHost,
             int minecraftPort,
-            Integer zstdNetPort
+            Integer zstdNetPort,
+            String zstdNetHost
     ) {
+        ResolvedEndpoints(String configuredServerIp, String targetHost, int minecraftPort, Integer zstdNetPort) {
+            this(configuredServerIp, targetHost, minecraftPort, zstdNetPort, targetHost);
+        }
+    }
+
+    static ResolvedEndpoints withNative(ResolvedEndpoints base,
+            io.github.therealkamisama.miguelnetwork.interop.ZstdPeer.ServerState state) {
+        var backend = state.backend();
+        return new ResolvedEndpoints(base.configuredServerIp(),
+                backend == null ? base.targetHost() : backend.getHostString(),
+                backend == null ? base.minecraftPort() : backend.getPort(),
+                state.ready() ? state.listener().getPort() : null,
+                state.ready() ? state.listener().getHostString() : base.targetHost());
     }
 }

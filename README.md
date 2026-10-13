@@ -4,6 +4,10 @@ The separate [Forge 1.7.10 / Java 25 platform](platform-forge-1.7.10/README.md)
 has its own build and [validation report](docs/FORGE_1_7_10_JAVA_25_VALIDATION.md).
 The root build remains NeoForge 1.21.1 / Java 21.
 
+The maintained 1.7.10 and Cleanroom 1.12.2 ports now use
+[native ZstdNet interoperability v1](docs/NATIVE_INTEROP_V1.md), without cross-mod
+Mixins or private-field adapters. Install updated native-API builds of both mods.
+
 > **Short description / 简短介绍**
 > MiguelNetwork adds WebSocket transport support to Minecraft for WebSocket-capable reverse proxies, managed ingress, and hosting platforms without arbitrary TCP listeners.
 > MiguelNetwork 为 Minecraft 增加 WebSocket 传输支持，适用于支持 WebSocket 的反向代理、托管入口及不开放任意 TCP 监听端口的托管平台。

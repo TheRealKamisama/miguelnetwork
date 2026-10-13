@@ -16,20 +16,15 @@ import java.util.Locale;
 
 final class DiscoveryDocumentProvider {
     private final DiscoveryIdentity identity;
-    private final String targetHost;
-    private final int minecraftPort;
-    private final Integer zstdNetPort;
+    private volatile ServerEndpointResolver.ResolvedEndpoints endpoints;
 
-    private DiscoveryDocumentProvider(
-            DiscoveryIdentity identity,
-            String targetHost,
-            int minecraftPort,
-            Integer zstdNetPort
-    ) {
+    private DiscoveryDocumentProvider(DiscoveryIdentity identity, ServerEndpointResolver.ResolvedEndpoints endpoints) {
         this.identity = identity;
-        this.targetHost = targetHost;
-        this.minecraftPort = minecraftPort;
-        this.zstdNetPort = zstdNetPort;
+        this.endpoints = endpoints;
+    }
+
+    void update(ServerEndpointResolver.ResolvedEndpoints endpoints) {
+        this.endpoints = java.util.Objects.requireNonNull(endpoints);
     }
 
     static DiscoveryDocumentProvider create(
@@ -38,8 +33,7 @@ final class DiscoveryDocumentProvider {
     ) throws Exception {
         DiscoveryIdentity identity = ServerConfig.signDiscoveryResponses()
                 ? DiscoveryIdentity.loadOrCreate(gameDirectory.resolve("config/miguelnetwork/generated")) : null;
-        return new DiscoveryDocumentProvider(
-                identity, endpoints.targetHost(), endpoints.minecraftPort(), endpoints.zstdNetPort());
+        return new DiscoveryDocumentProvider(identity, endpoints);
     }
 
     byte[] response(String rawAudience, byte[] request) throws Exception {
@@ -64,10 +58,18 @@ final class DiscoveryDocumentProvider {
     }
 
     private List<DiscoveryRoute> routes(HostPort advertised) {
+        var current = endpoints;
         List<DiscoveryRoute> routes = new ArrayList<>();
+        if (current.zstdNetPort() != null) {
+            routes.add(new DiscoveryRoute(
+                    "zstdnet-primary", ServerConfig.advertisedTransport(), advertised.host(), advertised.port(),
+                    ServerConfig.pathPrefix(), current.zstdNetHost(), current.zstdNetPort(), 200,
+                    List.of(new DiscoveryFilter(MiguelNetworkProtocol.ZSTDNET_FILTER, 1, true))
+            ));
+        }
         routes.add(new DiscoveryRoute(
                 "minecraft-primary", ServerConfig.advertisedTransport(), advertised.host(), advertised.port(),
-                ServerConfig.pathPrefix(), targetHost, minecraftPort, 100, List.of()
+                ServerConfig.pathPrefix(), current.targetHost(), current.minecraftPort(), 100, List.of()
         ));
         return routes;
     }

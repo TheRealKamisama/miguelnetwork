@@ -1,6 +1,8 @@
 package io.github.therealkamisama.miguelnetwork.client;
 
 import io.github.therealkamisama.miguelnetwork.MiguelNetwork;
+import io.github.therealkamisama.miguelnetwork.interop.NativeBridge;
+import io.github.therealkamisama.miguelnetwork.interop.ZstdPeer;
 import io.github.therealkamisama.miguelnetwork.config.ClientConfig;
 import io.github.therealkamisama.miguelnetwork.core.EndpointMatcher;
 import io.github.therealkamisama.miguelnetwork.core.ManagedWstunnelProcess;
@@ -32,6 +34,7 @@ public final class ClientTunnelManager {
     private static final Map<String, ClientTunnel> TUNNELS = new LinkedHashMap<>(16, 0.75f, true);
     private static final Map<String, CachedManifest> MANIFESTS = new LinkedHashMap<>(16, 0.75f, true);
     private static final Map<String, CachedLegacyRoute> LEGACY_ROUTES = new LinkedHashMap<>(16, 0.75f, true);
+    private static final java.util.Set<TunnelLease> ACTIVE_LEASES = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static ClientTrustStore trustStore;
     private static ClientDiscoveryService discoveryService;
     private static boolean insecureWarningLogged;
@@ -40,14 +43,51 @@ public final class ClientTunnelManager {
     private ClientTunnelManager() {
     }
 
-    /** One lease per socket; status requests cannot close a gameplay tunnel. */
+
+    /** One composite lease per socket; status requests never close gameplay. */
     public static synchronized TunnelLease acquire(InetSocketAddress original) {
-        if (!ClientConfig.enabled()) return new TunnelLease(original, null, false);
+        return acquire(original, () -> false);
+    }
+
+    public static synchronized TunnelLease acquire(InetSocketAddress original, java.util.function.BooleanSupplier cancelled) {
+        NativeBridge.checkCancelled(cancelled);
+        if (!ClientConfig.enabled()) return new TunnelLease(original, null, false, null);
+        ZstdPeer peer = ZstdPeer.get();
+        if (ownsEndpoint(original) || (peer != null && peer.ownsEndpoint(original))) {
+            return new TunnelLease(original, null, false, null, true);
+        }
         RoutePlan route = resolveRoute(original).orElse(null);
-        if (route == null || route.tcp()) return new TunnelLease(original, null, false);
-        ClientTunnel tunnel = startOrReuse(original, route);
+        NativeBridge.checkCancelled(cancelled);
+        if (route == null || route.tcp()) return new TunnelLease(original, null, false, null);
+        ClientTunnel tunnel = startOrReuse(original, route, cancelled);
         tunnel.references++;
-        return new TunnelLease(tunnel.localAddress(), tunnel, route.discovered());
+        ZstdPeer.Stream stream = null;
+        try {
+            NativeBridge.checkCancelled(cancelled);
+            boolean filtered = peer != null && peer.supportsStream()
+                    && route.discoveryRoute().filters().stream().anyMatch(filter ->
+                    MiguelNetworkProtocol.ZSTDNET_FILTER.equals(filter.id()) && filter.version() == 1);
+            if (filtered) {
+                if (peer == null) throw new IllegalStateException("Required native Zstd stream unavailable");
+                stream = peer.open(tunnel.localAddress(), original);
+            }
+            NativeBridge.checkCancelled(cancelled);
+            var lease = new TunnelLease(stream == null ? tunnel.localAddress() : stream.address(),
+                    tunnel, route.discovered(), stream);
+            ACTIVE_LEASES.add(lease);
+            return lease;
+        } catch (RuntimeException | Error failure) {
+            NativeBridge.closeQuietly(stream == null ? null : stream.lease());
+            release(tunnel);
+            throw failure;
+        }
+    }
+
+    private static boolean ownsEndpoint(InetSocketAddress address) {
+        String host = address.getAddress() == null ? address.getHostString() : address.getAddress().getHostAddress();
+        if (!(host.equals("127.0.0.1") || host.equalsIgnoreCase("localhost"))) return false;
+        return TUNNELS.values().stream().anyMatch(tunnel ->
+                tunnel.localAddress().getPort() == address.getPort() && tunnel.process().isAlive());
     }
 
     private static synchronized void release(ClientTunnel tunnel) {
@@ -60,21 +100,31 @@ public final class ClientTunnelManager {
         private final InetSocketAddress address;
         private final ClientTunnel tunnel;
         private final boolean discovered;
+        private final ZstdPeer.Stream stream;
+        private final boolean routed;
         private final java.util.concurrent.atomic.AtomicBoolean closed = new java.util.concurrent.atomic.AtomicBoolean();
 
-        private TunnelLease(InetSocketAddress address, ClientTunnel tunnel, boolean discovered) {
-            this.address = address;
-            this.tunnel = tunnel;
-            this.discovered = discovered;
+        private TunnelLease(InetSocketAddress address, ClientTunnel tunnel, boolean discovered, ZstdPeer.Stream stream) {
+            this(address, tunnel, discovered, stream, false);
         }
-
+        private TunnelLease(InetSocketAddress address, ClientTunnel tunnel, boolean discovered,
+                            ZstdPeer.Stream stream, boolean internal) {
+            this.address = address; this.tunnel = tunnel; this.discovered = discovered; this.stream = stream;
+            this.routed = internal || tunnel != null;
+        }
         public InetSocketAddress address() { return address; }
         public boolean tunneled() { return tunnel != null; }
+        public boolean routed() { return routed; }
         public boolean discovered() { return discovered; }
+        public boolean filtered() { return stream != null; }
+        public java.util.function.Supplier<Map<String,Object>> stats() { return stream == null ? null : stream.stats(); }
+        public Runnable connected() { return stream == null ? () -> {} : stream.connected(); }
 
-        @Override
-        public void close() {
-            if (closed.compareAndSet(false, true)) release(tunnel);
+        @Override public void close() {
+            if (!closed.compareAndSet(false, true)) return;
+            ACTIVE_LEASES.remove(this);
+            NativeBridge.closeQuietly(stream == null ? null : stream.lease());
+            release(tunnel);
         }
     }
 
@@ -121,7 +171,9 @@ public final class ClientTunnelManager {
             }
             boolean supported = true;
             for (DiscoveryFilter filter : route.filters()) {
-                boolean filterSupported = false; // No stream filters are implemented on this platform.
+                ZstdPeer peer = ZstdPeer.get();
+                boolean filterSupported = peer != null && peer.supportsStream()
+                        && MiguelNetworkProtocol.ZSTDNET_FILTER.equals(filter.id()) && filter.version() == 1;
                 if (filter.required() && !filterSupported) {
                     supported = false;
                     break;
@@ -192,7 +244,7 @@ public final class ClientTunnelManager {
         );
     }
 
-    private static ClientTunnel startOrReuse(InetSocketAddress original, RoutePlan route) {
+    private static ClientTunnel startOrReuse(InetSocketAddress original, RoutePlan route, java.util.function.BooleanSupplier cancelled) {
         String tunnelKey = endpoint(original) + "|" + route.cacheKey();
         ClientTunnel existing = TUNNELS.get(tunnelKey);
         if (existing != null && existing.process().isAlive()) {
@@ -221,13 +273,13 @@ public final class ClientTunnelManager {
                     line -> line.contains("Starting TCP server listening cnx on"),
                     MiguelNetwork.LOGGER
             );
-            started.awaitReady(Duration.ofSeconds(10));
+            started.awaitReady(Duration.ofSeconds(10), cancelled);
             ClientTunnel tunnel = new ClientTunnel(started, localPort);
             TUNNELS.put(tunnelKey, tunnel);
             MiguelNetwork.LOGGER.info("MiguelNetwork redirects {} through route {} to 127.0.0.1:{}",
                     endpoint(original), route.cacheKey(), localPort);
             return tunnel;
-        } catch (IOException exception) {
+        } catch (IOException | RuntimeException exception) {
             if (started != null) {
                 started.close();
             }
@@ -296,6 +348,7 @@ public final class ClientTunnelManager {
     }
 
     public static synchronized void stop() {
+        for (TunnelLease lease : java.util.List.copyOf(ACTIVE_LEASES)) lease.close();
         for (ClientTunnel tunnel : TUNNELS.values()) {
             tunnel.process().close();
         }

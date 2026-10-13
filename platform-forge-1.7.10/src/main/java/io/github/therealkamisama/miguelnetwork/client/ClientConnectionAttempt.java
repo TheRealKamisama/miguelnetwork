@@ -28,6 +28,8 @@ public final class ClientConnectionAttempt {
         if (current != null) current.close();
     }
 
+    public boolean cancelled() { return cancelled.get(); }
+
     void checkCancelled() {
         if (cancelled.get()) throw new CancellationException("MiguelNetwork connection cancelled");
     }

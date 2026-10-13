@@ -17,11 +17,12 @@ public final class ClientConnectionRedirect {
         // GuiConnecting and OldServerPinger retain their own original handshake arguments.
         var attempt = ClientConnectionAttempt.take();
         if (attempt != null) attempt.checkCancelled();
-        var lease = ClientTunnelManager.acquire(new InetSocketAddress(address, port));
+        var lease = ClientTunnelManager.acquire(new InetSocketAddress(address, port),
+                attempt == null ? () -> false : attempt::cancelled);
         try {
             if (attempt != null) attempt.checkCancelled();
             ChannelFuture future = bootstrap.connect(lease.address());
-            if (lease.tunneled()) future.channel().attr(ROUTED).set(Boolean.TRUE);
+            if (lease.routed()) future.channel().attr(ROUTED).set(Boolean.TRUE);
             if (lease.discovered()) future.channel().attr(DISCOVERY).set(Boolean.TRUE);
             // Process reaping must not hold up Netty's close notification or other connections.
             future.channel().closeFuture().addListener((ChannelFutureListener) closed ->

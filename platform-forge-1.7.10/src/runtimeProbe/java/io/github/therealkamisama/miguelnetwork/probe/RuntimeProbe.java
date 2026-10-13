@@ -33,6 +33,8 @@ public final class RuntimeProbe {
     private int playTicks;
     private int joins;
     private final boolean diagnostics = Boolean.getBoolean("miguelnetwork.probe.diagnostics");
+    private final boolean requireNative = Boolean.getBoolean("miguelnetwork.probe.requireNative");
+    private boolean reportRequested, reportChecked;
 
     @Mod.EventHandler
     public void init(FMLInitializationEvent event) {
@@ -96,8 +98,33 @@ public final class RuntimeProbe {
                 join(mc);
             } else if (phase == 2 && mc.theWorld != null && mc.thePlayer != null) {
                 playTicks++;
+                if (requireNative && joins == 0 && playTicks == 60) {
+                    Object stats = Class.forName("cn.tohsaka.factory.zstdnet.client.ClientConnection")
+                            .getMethod("snapshot").invoke(null);
+                    if (stats == null || !"ZSTD".equals(stats.getClass().getMethod("mode").invoke(stats).toString())
+                            || ((Number) stats.getClass().getMethod("rawUpBytes").invoke(stats)).longValue() <= 0
+                            || ((Number) stats.getClass().getMethod("rawDownBytes").invoke(stats)).longValue() <= 0) {
+                        throw new IllegalStateException("Native HUD statistics unavailable");
+                    }
+                    LOG.info("PROBE PASS native HUD statistics");
+                    net.minecraftforge.client.ClientCommandHandler.instance.executeCommand(mc.thePlayer, "/zstdreport session");
+                    reportRequested = true;
+                }
+                if (reportRequested && !reportChecked) {
+                    var folder = mc.mcDataDir.toPath().resolve("config/zstdnet/reports");
+                    if (java.nio.file.Files.isDirectory(folder)) {
+                        try (var files = java.nio.file.Files.walk(folder)) {
+                            reportChecked = files.anyMatch(file -> file.toString().endsWith(".html"));
+                        }
+                    }
+                    if (reportChecked) LOG.info("PROBE PASS native report received and rendered");
+                }
+                if (requireNative && joins == 0 && playTicks > 500 && !reportChecked) {
+                    throw new IllegalStateException("Native report did not arrive");
+                }
                 if (playTicks == 40) mc.thePlayer.sendChatMessage("/help");
-                if (playTicks >= 100 && mc.thePlayer.ticksExisted >= 80) {
+                if (playTicks >= 100 && mc.thePlayer.ticksExisted >= 80
+                        && (!requireNative || joins != 0 || reportChecked)) {
                     LOG.info("PROBE PASS gameplay join={} entity={} ticks={} position={},{},{}",
                             ++joins, mc.thePlayer.getEntityId(), mc.thePlayer.ticksExisted,
                             mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ);

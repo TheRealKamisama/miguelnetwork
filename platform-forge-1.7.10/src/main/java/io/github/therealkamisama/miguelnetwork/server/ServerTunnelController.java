@@ -26,6 +26,9 @@ public final class ServerTunnelController {
     private static ManagedWstunnelProcess process;
     private static DiscoveryHttpServer discoveryServer;
     private static StandaloneGateway standaloneGateway;
+    private static NativeContext nativeContext;
+    private static final java.util.concurrent.ExecutorService NATIVE_UPDATES =
+            java.util.concurrent.Executors.newSingleThreadExecutor(Thread.ofVirtual().name("MiguelNetwork-native-state").factory());
 
     private ServerTunnelController() {
     }
@@ -34,42 +37,121 @@ public final class ServerTunnelController {
         start(PlatformPaths.gameDirectory(), server.getServerPort());
     }
 
-    static synchronized void start(Path gameDirectory, int minecraftPort) {
+
+     static synchronized void start(Path gameDirectory, int minecraftPort) {
+        stop();
         if (!ServerConfig.enabled()) {
             MiguelNetwork.LOGGER.info("MiguelNetwork server tunnel is disabled");
             return;
         }
-        stop();
         try {
-            OptionalInt detectedZstdPort = OptionalInt.empty();
-            ServerEndpointResolver.ResolvedEndpoints endpoints = ServerEndpointResolver.resolve(
-                    gameDirectory, minecraftPort, detectedZstdPort);
-            validatePorts(endpoints);
-
-            List<Integer> allowedTargetPorts = new ArrayList<>();
-            allowedTargetPorts.add(endpoints.minecraftPort());
-            if (endpoints.zstdNetPort() != null && endpoints.zstdNetPort() != endpoints.minecraftPort()) {
-                allowedTargetPorts.add(endpoints.zstdNetPort());
+            NativeContext context = new NativeContext(gameDirectory,
+                    ServerEndpointResolver.resolve(gameDirectory, minecraftPort, OptionalInt.empty()));
+            nativeContext = context;
+            var peer = io.github.therealkamisama.miguelnetwork.interop.ZstdPeer.get();
+            if (peer != null && peer.supportsServer()) {
+                context.subscription = peer.watchServer(state -> {
+                    context.latest = state;
+                    context.initial.complete(null);
+                    NATIVE_UPDATES.execute(() -> refreshNative(context));
+                });
+                context.initial.get(3, java.util.concurrent.TimeUnit.SECONDS);
             }
+            var endpoints = ServerEndpointResolver.withNative(context.base, context.latest);
+            validatePorts(endpoints);
+            context.applied = endpoints;
             Path executable = NativeWstunnel.resolve(gameDirectory);
-            Path generated = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
-            Files.createDirectories(generated.getParent());
-            Files.writeString(generated,
-                    restrictions(ServerConfig.pathPrefix(), endpoints.targetHost(), allowedTargetPorts),
-                    StandardCharsets.UTF_8);
+            context.restrictions = gameDirectory.resolve("config/miguelnetwork/generated/restrictions.yaml");
+            writeRestrictions(context.restrictions, restrictions(ServerConfig.pathPrefix(), endpoints));
             ServerEndpointResolver.writeDetectedConfiguration(
                     gameDirectory, endpoints, ServerConfig.mode(), ServerConfig.bindHost(), ServerConfig.publicPort());
-
-            DiscoveryDocumentProvider documents = ServerConfig.discoveryEnabled()
+            context.documents = ServerConfig.discoveryEnabled()
                     ? DiscoveryDocumentProvider.create(gameDirectory, endpoints) : null;
             if (ServerConfig.mode() == DeploymentMode.STANDALONE) {
-                startStandalone(executable, generated, documents, endpoints);
+                startStandalone(executable, context.restrictions, context.documents, endpoints);
             } else {
-                startExternalProxy(executable, generated, documents, endpoints);
+                startExternalProxy(executable, context.restrictions, context.documents, endpoints);
             }
+            context.started = true;
         } catch (Exception exception) {
             stop();
             MiguelNetwork.LOGGER.error("MiguelNetwork server tunnel failed to start", exception);
+        }
+    }
+
+    private static synchronized void refreshNative(NativeContext context) {
+        if (nativeContext != context || !context.started || process == null || !process.isAlive()) return;
+        var state = context.latest;
+        var endpoints = ServerEndpointResolver.withNative(context.base, state);
+        if (endpoints.equals(context.applied)) return;
+        try {
+            validatePorts(endpoints);
+            // Withdraw a changed compression route while forwarding rules are being applied.
+            if (context.documents != null) {
+                context.documents.update(new ServerEndpointResolver.ResolvedEndpoints(
+                        context.applied.configuredServerIp(), context.applied.targetHost(),
+                        context.applied.minecraftPort(), null));
+            }
+            var acknowledgement = process.expectOutput(line -> line.contains("Restrictions config file has been reloaded"));
+            try {
+                writeRestrictions(context.restrictions, restrictions(ServerConfig.pathPrefix(), endpoints));
+                acknowledgement.get(5, java.util.concurrent.TimeUnit.SECONDS);
+            } finally { acknowledgement.cancel(false); }
+            context.applied = endpoints;
+            ServerEndpointResolver.writeDetectedConfiguration(context.directory, endpoints,
+                    ServerConfig.mode(), ServerConfig.bindHost(), ServerConfig.publicPort());
+            if (context.documents != null) context.documents.update(endpoints);
+            MiguelNetwork.LOGGER.info("MiguelNetwork applied native ZstdNet server state generation {}", state.generation());
+        } catch (Exception failure) {
+            // The public gateway must not advertise targets after a forwarding-rule failure.
+            MiguelNetwork.LOGGER.error("MiguelNetwork native server route update failed; stopping gateway", failure);
+            stop();
+        }
+    }
+
+    private static void writeRestrictions(Path path, String content) throws IOException {
+        Files.createDirectories(path.getParent());
+        Path temporary = Files.createTempFile(path.getParent(), "restrictions-", ".tmp");
+        try {
+            Files.writeString(temporary, content, StandardCharsets.UTF_8);
+            try {
+                Files.move(temporary, path, java.nio.file.StandardCopyOption.ATOMIC_MOVE,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            } catch (java.nio.file.AtomicMoveNotSupportedException unsupported) {
+                Files.move(temporary, path, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } finally { Files.deleteIfExists(temporary); }
+    }
+
+    static String restrictions(String prefix, ServerEndpointResolver.ResolvedEndpoints endpoints) {
+        List<InetSocketAddress> targets = new ArrayList<>();
+        targets.add(InetSocketAddress.createUnresolved(endpoints.targetHost(), endpoints.minecraftPort()));
+        if (endpoints.zstdNetPort() != null) {
+            targets.add(InetSocketAddress.createUnresolved(endpoints.zstdNetHost(), endpoints.zstdNetPort()));
+        }
+        StringBuilder result = new StringBuilder();
+        for (var target : targets.stream().distinct().toList()) {
+            String document = restrictions(prefix, target.getHostString(), List.of(target.getPort()));
+            int allow = document.indexOf("      - !Tunnel");
+            if (result.isEmpty()) result.append(document, 0, allow);
+            result.append(document.substring(allow));
+        }
+        return result.toString();
+    }
+
+    private static final class NativeContext {
+        final Path directory;
+        final ServerEndpointResolver.ResolvedEndpoints base;
+        final java.util.concurrent.CompletableFuture<Void> initial = new java.util.concurrent.CompletableFuture<>();
+        volatile io.github.therealkamisama.miguelnetwork.interop.ZstdPeer.ServerState latest =
+                io.github.therealkamisama.miguelnetwork.interop.ZstdPeer.ServerState.inactive();
+        AutoCloseable subscription;
+        ServerEndpointResolver.ResolvedEndpoints applied;
+        DiscoveryDocumentProvider documents;
+        Path restrictions;
+        boolean started;
+        NativeContext(Path directory, ServerEndpointResolver.ResolvedEndpoints base) {
+            this.directory = directory; this.base = base;
         }
     }
 
@@ -126,7 +208,7 @@ public final class ServerTunnelController {
                 endpoints.targetHost(), endpoints.minecraftPort());
         if (endpoints.zstdNetPort() != null) {
             MiguelNetwork.LOGGER.info("MiguelNetwork advertises detected ZstdNet target {}:{}",
-                    endpoints.targetHost(), endpoints.zstdNetPort());
+                    endpoints.zstdNetHost(), endpoints.zstdNetPort());
         }
         MiguelNetwork.LOGGER.info("MiguelNetwork Discovery signatures are {}",
                 ServerConfig.signDiscoveryResponses() ? "enabled" : "disabled");
@@ -213,6 +295,9 @@ public final class ServerTunnelController {
     }
 
     public static synchronized void stop() {
+        NativeContext closing = nativeContext;
+        nativeContext = null;
+        if (closing != null) io.github.therealkamisama.miguelnetwork.interop.NativeBridge.closeQuietly(closing.subscription);
         if (standaloneGateway != null) {
             standaloneGateway.close();
             standaloneGateway = null;
