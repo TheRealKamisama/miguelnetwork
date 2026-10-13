@@ -1,5 +1,7 @@
 # Build and release
 
+> Current release policy: [GitHub + CurseForge dual channels](RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 MiguelNetwork builds with Java 21. The standard build downloads the pinned official wstunnel archives, validates the
 archive and extracted executable SHA-256 values from
 `src/main/resources/META-INF/miguelnetwork/wstunnel-manifest.json`, and packages Windows x64 and Linux x64 executables

@@ -32,6 +32,7 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][A-Za-z0-9.-]+)?$ ]] || { echo "Invalid release version" >&2; exit 1; }
           ./gradlew verifyReleaseVersion --no-daemon -PreleaseVersion="$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Validate CurseForge configuration
@@ -128,7 +129,7 @@ jobs:
             gh release create "$GITHUB_REF_NAME" \
               "${{ steps.artifacts.outputs.bundled_path }}" SHA256SUMS \
               --verify-tag \
-              --title "MiguelNetwork $RELEASE_VERSION" \
+              --title "MiguelNetwork neoforge 1.21.1 $RELEASE_VERSION" \
               --generate-notes \
               "${release_flags[@]}"
           fi
@@ -147,7 +148,7 @@ jobs:
 
           metadata=$(jq -cn \
             --arg changelog "$(cat CHANGELOG.md)" \
-            --arg displayName "MiguelNetwork $RELEASE_VERSION" \
+            --arg displayName "MiguelNetwork neoforge 1.21.1 $RELEASE_VERSION" \
             --arg releaseType "$release_type" \
             --argjson gameVersions "$CURSEFORGE_GAME_VERSION_IDS" \
             '{changelog: $changelog, changelogType: "markdown", displayName: $displayName,

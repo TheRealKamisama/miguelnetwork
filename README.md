@@ -1,5 +1,7 @@
 # MiguelNetwork
 
+> Current release policy: [GitHub + CurseForge dual channels](docs/RELEASE_CHANNELS.md). This replaces earlier single-channel or main-only instructions.
+
 > **Short description / 简短介绍**
 > MiguelNetwork adds WebSocket transport support to Minecraft for WebSocket-capable reverse proxies, managed ingress, and hosting platforms without arbitrary TCP listeners.
 > MiguelNetwork 为 Minecraft 增加 WebSocket 传输支持，适用于支持 WebSocket 的反向代理、托管入口及不开放任意 TCP 监听端口的托管平台。

@@ -87,8 +87,18 @@ downgrade. See `docs/USER_GUIDE.md` for the complete checklist.
 
 ## Release safety
 
+Agents may create commits and push branch changes autonomously within the user's
+task scope; separate confirmation is not required for commits or branch pushes.
+Review the diff, preserve unrelated user changes, and verify the destination remote
+before pushing. This permission does not authorize force-pushing or rewriting
+shared history.
+
+Publishing a release or artifact, creating or pushing release tags, and triggering
+a release workflow still require explicit user authorization for that operation.
+Do not log in to GitHub or create a repository without explicit authorization.
 Local release preparation may install and verify GitHub CLI, build artifacts, and
-documentation. Do not log in to GitHub, create a repository/release, tag, commit,
-push, or publish an artifact unless the user explicitly requests that exact
-operation. The current remote may be a local mirror; verify it before any future
-GitHub operation. Follow `docs/RELEASE_CHECKLIST.md` for the remaining gate.
+documentation. Follow `docs/RELEASE_CHECKLIST.md` for release gates.
+
+## Distribution policy
+
+All maintained branches use GitHub Release (bundled natives) and CurseForge (native-free production JAR with the main runtime acquisition policy). See `docs/RELEASE_CHANNELS.md`. Run both distribution verifiers. Keep the public `CURSEFORGE.md` free of acquisition settings/details and aligned with STANDALONE/plain WS usage.
